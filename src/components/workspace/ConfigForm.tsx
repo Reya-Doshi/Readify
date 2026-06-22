@@ -2,28 +2,18 @@ import React, { useState } from 'react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
-import { Dropdown } from '../ui/Dropdown';
-import { Switch } from '../ui/Switch';
 import { Plus, X, Trash2 } from 'lucide-react';
-import type { Project } from '../../types/database';
+import type { ReadmeProject } from '../../types/database';
 
 interface ConfigFormProps {
-  formData: Omit<Project, 'id' | 'user_id' | 'created_at' | 'updated_at'>;
-  setFormData: React.Dispatch<React.SetStateAction<Omit<Project, 'id' | 'user_id' | 'created_at' | 'updated_at'>>>;
+  formData: Omit<ReadmeProject, 'id' | 'created_at'>;
+  setFormData: React.Dispatch<React.SetStateAction<Omit<ReadmeProject, 'id' | 'created_at'>>>;
   onGenerate: () => void;
   isGenerating: boolean;
 }
 
 const QUICK_TECH_OPTIONS = [
-  'React', 'Next.js', 'Node.js', 'TypeScript', 'Python', 'Go', 'MongoDB', 'PostgreSQL', 'Docker', 'AWS'
-];
-
-const STYLE_OPTIONS = [
-  { value: 'minimal', label: 'Minimal Style', description: 'Clean bullet points, no badges, straight text.' },
-  { value: 'open-source', label: 'Open Source Style', description: 'Extensive badges, details, contribution rules.' },
-  { value: 'professional', label: 'Professional Style', description: 'Clean layout, API specs, modular tags.' },
-  { value: 'startup', label: 'Startup Style', description: 'Feature grid showcase, rich emojis, structure.' },
-  { value: 'enterprise', label: 'Enterprise Style', description: 'Formal outline, compliance notices, licenses.' },
+  'React', 'Next.js', 'Node.js', 'Express', 'TypeScript', 'Python', 'Go', 'MongoDB', 'PostgreSQL', 'Docker', 'AWS'
 ];
 
 export const ConfigForm: React.FC<ConfigFormProps> = ({
@@ -38,10 +28,10 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
   // Tech Stack Handlers
   const addTechTag = (tag: string) => {
     const cleanTag = tag.trim();
-    if (cleanTag && !formData.tech_stack.includes(cleanTag)) {
+    if (cleanTag && formData.tech_stack && !formData.tech_stack.includes(cleanTag)) {
       setFormData(prev => ({
         ...prev,
-        tech_stack: [...prev.tech_stack, cleanTag]
+        tech_stack: [...(prev.tech_stack || []), cleanTag]
       }));
     }
   };
@@ -49,7 +39,7 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
   const removeTechTag = (tag: string) => {
     setFormData(prev => ({
       ...prev,
-      tech_stack: prev.tech_stack.filter(t => t !== tag)
+      tech_stack: (prev.tech_stack || []).filter(t => t !== tag)
     }));
   };
 
@@ -64,10 +54,10 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
   // Feature List Handlers
   const addFeature = () => {
     const cleanFeature = featureInput.trim();
-    if (cleanFeature && !formData.features.includes(cleanFeature)) {
+    if (cleanFeature && formData.features && !formData.features.includes(cleanFeature)) {
       setFormData(prev => ({
         ...prev,
-        features: [...prev.features, cleanFeature]
+        features: [...(prev.features || []), cleanFeature]
       }));
       setFeatureInput('');
     }
@@ -76,7 +66,7 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
   const removeFeature = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      features: prev.features.filter((_, i) => i !== index)
+      features: (prev.features || []).filter((_, i) => i !== index)
     }));
   };
 
@@ -85,17 +75,6 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
       e.preventDefault();
       addFeature();
     }
-  };
-
-  // Advanced Option toggle
-  const toggleAdvancedOption = (key: keyof NonNullable<Project['advanced_options']>) => {
-    setFormData(prev => ({
-      ...prev,
-      advanced_options: {
-        ...prev.advanced_options!,
-        [key]: !prev.advanced_options![key]
-      }
-    }));
   };
 
   return (
@@ -110,7 +89,7 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
         <Input
           label="Project Name"
           type="text"
-          placeholder="e.g. readify-core"
+          placeholder="e.g. Task Manager API"
           value={formData.project_name}
           onChange={(e) => setFormData(prev => ({ ...prev, project_name: e.target.value }))}
           required
@@ -118,9 +97,10 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
 
         <Textarea
           label="Short Description"
-          placeholder="Briefly summarize what your project does..."
-          value={formData.description}
+          placeholder="e.g. A scalable REST API built using Node.js and Express to manage tasks and collaborations securely."
+          value={formData.description || ''}
           onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+          rows={4}
         />
       </div>
 
@@ -149,7 +129,7 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
 
         {/* Current stack tags */}
         <div className="flex flex-wrap gap-1.5 py-1">
-          {formData.tech_stack.length > 0 ? (
+          {formData.tech_stack && formData.tech_stack.length > 0 ? (
             formData.tech_stack.map((tag) => (
               <span
                 key={tag}
@@ -174,7 +154,7 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
         <div className="flex flex-wrap gap-1 items-center">
           <span className="text-[10px] text-neutral-low/55 uppercase mr-1">Quick Add:</span>
           {QUICK_TECH_OPTIONS.map((tech) => {
-            const hasTech = formData.tech_stack.includes(tech);
+            const hasTech = formData.tech_stack && formData.tech_stack.includes(tech);
             return (
               <button
                 key={tech}
@@ -217,8 +197,8 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
         </div>
 
         {/* List of features */}
-        <ul className="space-y-2 max-h-40 overflow-y-auto py-1">
-          {formData.features.length > 0 ? (
+        <ul className="space-y-2 max-h-48 overflow-y-auto py-1">
+          {formData.features && formData.features.length > 0 ? (
             formData.features.map((feature, idx) => (
               <li
                 key={idx}
@@ -238,88 +218,6 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
             <span className="text-xs text-neutral-low/40">Add features list to showcase in the README.</span>
           )}
         </ul>
-      </div>
-
-      {/* 4. Setup & Usage */}
-      <div className="space-y-4">
-        <h3 className="text-xs font-bold text-neutral-high uppercase tracking-wider border-b border-white/[0.06] pb-2">
-          Setup Instructions
-        </h3>
-        
-        <Textarea
-          label="Installation Commands"
-          placeholder="npm install&#10;cp .env.example .env&#10;npm run dev"
-          value={formData.installation}
-          onChange={(e) => setFormData(prev => ({ ...prev, installation: e.target.value }))}
-          rows={3}
-        />
-
-        <Textarea
-          label="Usage Code Example"
-          placeholder="const core = require('readify');&#10;core.init();"
-          value={formData.usage}
-          onChange={(e) => setFormData(prev => ({ ...prev, usage: e.target.value }))}
-          rows={3}
-        />
-      </div>
-
-      {/* 5. Styles Dropdown */}
-      <div className="space-y-4">
-        <h3 className="text-xs font-bold text-neutral-high uppercase tracking-wider border-b border-white/[0.06] pb-2">
-          Documentation Style
-        </h3>
-        
-        <Dropdown
-          options={STYLE_OPTIONS}
-          value={formData.template_style}
-          onChange={(val) => setFormData(prev => ({ ...prev, template_style: val as any }))}
-        />
-      </div>
-
-      {/* 6. Advanced Checkboxes */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-bold text-neutral-high uppercase tracking-wider border-b border-white/[0.06] pb-2">
-          Advanced Layout Options
-        </h3>
-
-        <div className="grid grid-cols-1 gap-1">
-          <Switch
-            label="Include Badges"
-            description="Add status badges (build, license, version) in header"
-            checked={!!formData.advanced_options?.includeBadges}
-            onChange={() => toggleAdvancedOption('includeBadges')}
-          />
-          <Switch
-            label="Include Installation"
-            description="Add code setup segments"
-            checked={!!formData.advanced_options?.includeInstallation}
-            onChange={() => toggleAdvancedOption('includeInstallation')}
-          />
-          <Switch
-            label="Include API Specs"
-            description="Table detailing routing paths"
-            checked={!!formData.advanced_options?.includeApiDocs}
-            onChange={() => toggleAdvancedOption('includeApiDocs')}
-          />
-          <Switch
-            label="Include Architecture Schema"
-            description="Mermaid diagram depicting dependencies"
-            checked={!!formData.advanced_options?.includeArchitecture}
-            onChange={() => toggleAdvancedOption('includeArchitecture')}
-          />
-          <Switch
-            label="Include Contribution Rules"
-            description="Contributing checklist instructions"
-            checked={!!formData.advanced_options?.includeContribution}
-            onChange={() => toggleAdvancedOption('includeContribution')}
-          />
-          <Switch
-            label="Include License Section"
-            description="MIT/Proprietary licensing paragraph"
-            checked={!!formData.advanced_options?.includeLicense}
-            onChange={() => toggleAdvancedOption('includeLicense')}
-          />
-        </div>
       </div>
 
       {/* Large Generate Button */}

@@ -7,13 +7,13 @@ import { Badge } from '../components/ui/Badge';
 import { GlassCard } from '../components/ui/GlassCard';
 import { 
   FileText, 
-  Star, 
-  FolderGit2, 
+  Layers, 
   ExternalLink, 
   Trash2, 
   Copy, 
   Plus,
-  Compass
+  Compass,
+  Database
 } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
@@ -21,19 +21,20 @@ export const DashboardPage: React.FC = () => {
     projects, 
     isLoading, 
     deleteProject, 
-    duplicateProject, 
-    toggleFavoriteProject 
+    duplicateProject,
+    error
   } = useProjects();
   const { navigateTo } = useRouter();
 
   // Compute metrics
   const totalProjects = projects.length;
-  const favoriteProjects = projects.filter(p => p.is_favorite).length;
   
   // Get all unique tech tags used across projects
   const uniqueTech = Array.from(
     new Set(projects.flatMap(p => p.tech_stack || []))
   ).slice(0, 5);
+
+  const totalTech = uniqueTech.length;
 
   const formatDate = (isoString: string) => {
     try {
@@ -78,13 +79,21 @@ export const DashboardPage: React.FC = () => {
           </Button>
         </div>
 
+        {/* Database Error Banner */}
+        {error && (
+          <div className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs font-semibold flex items-center gap-2">
+            <Compass className="h-4.5 w-4.5 shrink-0" />
+            <span>Database Error: {error}. Please verify VITE_SUPABASE_URL and credentials in your .env configuration.</span>
+          </div>
+        )}
+
         {/* Statistics Cards Row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {/* Stat 1: Total Generated */}
           <GlassCard className="p-5 border-white/[0.04] hover:border-white/[0.08] flex items-center justify-between">
             <div className="text-left space-y-1">
               <span className="text-[10px] uppercase font-bold text-neutral-low/50 tracking-wider">
-                Total Generated
+                Total READMEs
               </span>
               <p className="text-3xl font-extrabold text-neutral-high">{totalProjects}</p>
             </div>
@@ -93,16 +102,16 @@ export const DashboardPage: React.FC = () => {
             </div>
           </GlassCard>
 
-          {/* Stat 2: Starred Docs */}
+          {/* Stat 2: Technologies */}
           <GlassCard className="p-5 border-white/[0.04] hover:border-white/[0.08] flex items-center justify-between">
             <div className="text-left space-y-1">
               <span className="text-[10px] uppercase font-bold text-neutral-low/50 tracking-wider">
-                Favorites
+                Active Technologies
               </span>
-              <p className="text-3xl font-extrabold text-neutral-high">{favoriteProjects}</p>
+              <p className="text-3xl font-extrabold text-neutral-high">{totalTech}</p>
             </div>
-            <div className="h-10 w-10 rounded-lg bg-amber-500/5 border border-amber-500/15 flex items-center justify-center text-amber-500">
-              <Star className="h-5 w-5 fill-current" />
+            <div className="h-10 w-10 rounded-lg bg-indigo-500/5 border border-indigo-500/15 flex items-center justify-center text-indigo-400">
+              <Layers className="h-5 w-5" />
             </div>
           </GlassCard>
 
@@ -110,22 +119,15 @@ export const DashboardPage: React.FC = () => {
           <GlassCard className="p-5 border-white/[0.04] hover:border-white/[0.08] flex items-center justify-between">
             <div className="text-left space-y-1">
               <span className="text-[10px] uppercase font-bold text-neutral-low/50 tracking-wider">
-                Tech Scope
+                Supabase Sync
               </span>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {uniqueTech.length > 0 ? (
-                  uniqueTech.map(t => (
-                    <span key={t} className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[9px] border border-white/[0.08] text-neutral-low">
-                      {t}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-[11px] text-neutral-low/40">No stack defined</span>
-                )}
+              <div className="flex items-center gap-1.5 mt-2">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="text-xs font-semibold text-emerald-400">PostgreSQL Connected</span>
               </div>
             </div>
             <div className="h-10 w-10 rounded-lg bg-emerald-500/5 border border-emerald-500/15 flex items-center justify-center text-emerald-500">
-              <FolderGit2 className="h-5 w-5" />
+              <Database className="h-5 w-5" />
             </div>
           </GlassCard>
         </div>
@@ -148,7 +150,7 @@ export const DashboardPage: React.FC = () => {
                 <Compass className="h-6 w-6" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-sm font-bold text-neutral-high">No documentation folders found</h3>
+                <h3 className="text-sm font-bold text-neutral-high">No documentation files found</h3>
                 <p className="text-xs text-neutral-low/50 leading-relaxed">
                   Start configuring your repository parameters to generate structured markdown README blocks.
                 </p>
@@ -172,28 +174,9 @@ export const DashboardPage: React.FC = () => {
                 >
                   {/* Top Header info */}
                   <div className="flex flex-col gap-2 text-left">
-                    <div className="flex items-start justify-between">
-                      {/* Name & Template label */}
-                      <div className="flex flex-col gap-0.5">
-                        <h3 className="text-base font-bold text-neutral-high group-hover:text-accent transition-colors duration-200">
-                          {project.project_name}
-                        </h3>
-                        <span className="text-[10px] text-neutral-low/50 font-medium capitalize">
-                          Style: {project.template_style}
-                        </span>
-                      </div>
-
-                      {/* Favorite star */}
-                      <button
-                        onClick={() => toggleFavoriteProject(project.id)}
-                        className={`p-1.5 rounded-lg border border-white/[0.06] hover:bg-white/[0.04] transition-colors ${
-                          project.is_favorite ? 'text-amber-400 bg-amber-500/5' : 'text-neutral-low/30'
-                        }`}
-                      >
-                        <Star className={`h-4 w-4 ${project.is_favorite ? 'fill-current' : ''}`} />
-                      </button>
-                    </div>
-
+                    <h3 className="text-base font-bold text-neutral-high group-hover:text-accent transition-colors duration-200">
+                      {project.project_name}
+                    </h3>
                     <p className="text-xs text-neutral-low/70 line-clamp-2 mt-1 leading-relaxed">
                       {project.description || 'No project description added.'}
                     </p>
@@ -201,7 +184,7 @@ export const DashboardPage: React.FC = () => {
 
                   {/* Tech stack badge tags */}
                   <div className="flex flex-wrap gap-1.5">
-                    {project.tech_stack?.slice(0, 4).map((tech) => (
+                    {project.tech_stack && project.tech_stack.slice(0, 4).map((tech) => (
                       <Badge key={tech} variant="outline" className="text-[10px]">
                         {tech}
                       </Badge>
@@ -216,7 +199,7 @@ export const DashboardPage: React.FC = () => {
                   {/* Card Bottom Panel / Actions */}
                   <div className="flex items-center justify-between border-t border-white/[0.04] pt-4 mt-auto">
                     <span className="text-[10px] text-neutral-low/40">
-                      Edited {formatDate(project.updated_at)}
+                      Created {formatDate(project.created_at)}
                     </span>
 
                     {/* Action buttons */}

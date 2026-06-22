@@ -1,6 +1,6 @@
-// Forced local sandbox mode for frontend-only prototyping
-export const isSupabaseConfigured = false;
+import { supabase as realSupabase } from './supabase';
 
-export const supabase = null as any;
+export const isSupabaseConfigured = true;
+export const supabase = realSupabase;
 
-console.log('Readify running in forced local frontend prototype mode.');
+console.log('Readify connected to Supabase Database Client.');

@@ -6,85 +6,40 @@ import { LoadingModal } from '../components/ui/LoadingModal';
 import { useRouter } from '../lib/router';
 import { useProjects } from '../hooks/useProjects';
 import { compileReadmeLocally } from '../services/readmeCompiler';
-import type { Project } from '../types/database';
-import { ArrowLeft, Check } from 'lucide-react';
+import type { ReadmeProject } from '../types/database';
+import { ArrowLeft, Check, Compass } from 'lucide-react';
 
 const TEMPLATE_PRESETS = [
   {
     name: 'Minimal API Service',
-    description: 'Boilerplate REST microservice with Express',
+    description: 'A lightweight boilerplate REST microservice with Express and JSON Web Tokens.',
     tech_stack: ['Node.js', 'Express', 'Docker', 'JWT'],
-    features: ['Fast routing middleware', 'JSON request parsing', 'Docker containerized'],
-    template_style: 'minimal' as const,
-    installation: 'npm install\ncp .env.example .env\nnpm run dev',
-    usage: 'const express = require("express");\nconst app = express();\napp.listen(5000);',
-    advanced_options: {
-      includeBadges: true,
-      includeInstallation: true,
-      includeApiDocs: true,
-      includeArchitecture: false,
-      includeContribution: false,
-      includeLicense: true
-    }
+    features: ['Fast routing middleware', 'JSON request parsing', 'Docker containerized configuration']
   },
   {
     name: 'Open-Source Package',
-    description: 'React TS component library ready to publish',
+    description: 'A React TS modular component library ready to build and publish.',
     tech_stack: ['React', 'TypeScript', 'Vite', 'ESLint'],
-    features: ['Modular components export', 'TS Type-safe design', 'Vite compiler', 'Jest unit testing'],
-    template_style: 'open-source' as const,
-    installation: 'npm install\nnpm run build\nnpm test',
-    usage: 'import { Card } from "my-lib";\nexport default () => <Card>Hello</Card>;',
-    advanced_options: {
-      includeBadges: true,
-      includeInstallation: true,
-      includeApiDocs: false,
-      includeArchitecture: true,
-      includeContribution: true,
-      includeLicense: true
-    }
+    features: ['Modular exports', 'TS Type-safe architecture', 'ESLint syntax compiler', 'Jest unit testing framework']
   },
   {
     name: 'SaaS Startup Dashboard',
-    description: 'Full stack Next.js app with authentication',
+    description: 'A full stack Next.js application template with PostgreSQL auth syncing.',
     tech_stack: ['Next.js', 'Tailwind CSS', 'Supabase', 'PostgreSQL'],
-    features: ['Supabase Row-Level Security', 'Sleek dark theme UI dashboard', 'Interactive statistics widgets'],
-    template_style: 'startup' as const,
-    installation: 'npm install\nnpm run dev',
-    usage: 'import { createClient } from "@supabase/supabase-js";\nconst db = createClient(URL, KEY);',
-    advanced_options: {
-      includeBadges: true,
-      includeInstallation: true,
-      includeApiDocs: true,
-      includeArchitecture: true,
-      includeContribution: false,
-      includeLicense: true
-    }
+    features: ['Supabase Row-Level Security policies', 'Sleek dark theme UI dashboard panel', 'Interactive statistics widgets']
   }
 ];
 
 export const WorkspacePage: React.FC = () => {
   const { activeProjectId, navigateTo } = useRouter();
-  const { projects, createProject, updateProject } = useProjects();
+  const { projects, createProject, updateProject, error: dbError } = useProjects();
 
-  const [formData, setFormData] = useState<Omit<Project, 'id' | 'user_id' | 'created_at' | 'updated_at'>>({
+  const [formData, setFormData] = useState<Omit<ReadmeProject, 'id' | 'created_at'>>({
     project_name: '',
     description: '',
     tech_stack: [],
     features: [],
-    template_style: 'minimal',
-    is_favorite: false,
-    installation: '',
-    usage: '',
-    advanced_options: {
-      includeBadges: true,
-      includeInstallation: true,
-      includeApiDocs: false,
-      includeArchitecture: false,
-      includeContribution: false,
-      includeLicense: true
-    },
-    readme_content: ''
+    generated_readme: ''
   });
 
   const [isGenerating, setIsGenerating] = useState(false);
@@ -101,19 +56,7 @@ export const WorkspacePage: React.FC = () => {
           description: activeProj.description || '',
           tech_stack: activeProj.tech_stack || [],
           features: activeProj.features || [],
-          template_style: activeProj.template_style || 'minimal',
-          is_favorite: activeProj.is_favorite || false,
-          installation: activeProj.installation || '',
-          usage: activeProj.usage || '',
-          advanced_options: activeProj.advanced_options || {
-            includeBadges: true,
-            includeInstallation: true,
-            includeApiDocs: false,
-            includeArchitecture: false,
-            includeContribution: false,
-            includeLicense: true
-          },
-          readme_content: activeProj.readme_content || ''
+          generated_readme: activeProj.generated_readme || ''
         });
       }
     }
@@ -125,12 +68,7 @@ export const WorkspacePage: React.FC = () => {
       description: preset.description,
       tech_stack: [...preset.tech_stack],
       features: [...preset.features],
-      template_style: preset.template_style,
-      is_favorite: false,
-      installation: preset.installation,
-      usage: preset.usage,
-      advanced_options: { ...preset.advanced_options },
-      readme_content: ''
+      generated_readme: ''
     });
   };
 
@@ -143,52 +81,121 @@ export const WorkspacePage: React.FC = () => {
     setIsGenerating(true);
     setShowLoading(true);
 
-    // AI loader overlay runs for 6 seconds (message rotation)
-    setTimeout(async () => {
-      // Compile content locally or request API server
-      const compiledMarkdown = compileReadmeLocally(formData);
+    let generatedMarkdown = '';
+    let isSavedOnServer = false;
+    
+    try {
+      // Connect to Node.js Express server to generate README via Gemini
+      const response = await fetch('http://localhost:5000/api/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: activeProjectId,
+          name: formData.project_name,
+          description: formData.description,
+          techStack: formData.tech_stack,
+          features: formData.features,
+        }),
+      });
 
-      // Simulated typing effect or section reveal
+      if (!response.ok) {
+        throw new Error('Express API failed to respond.');
+      }
+
+      const result = await response.json();
+      generatedMarkdown = result.readme;
       
-      setShowLoading(false);
+      if (result.project) {
+        isSavedOnServer = true;
+        if (activeProjectId) {
+          setFormData(prev => ({ ...prev, generated_readme: generatedMarkdown }));
+        } else {
+          navigateTo('workspace', result.project.id);
+        }
+      }
+    } catch (err) {
+      console.warn('Backend API offline or missing key. Compiling locally as fallback...', err);
+      // Fail-safe compilation if backend is not running
+      generatedMarkdown = compileReadmeLocally({
+        project_name: formData.project_name,
+        description: formData.description || '',
+        tech_stack: formData.tech_stack || [],
+        features: formData.features || [],
+        generated_readme: ''
+      });
+    }
 
-      // Save/update project in database
+    // Save/update project in database (client-side fallback if server-side save was skipped/errored)
+    if (!isSavedOnServer) {
       if (activeProjectId) {
         await updateProject(activeProjectId, {
           ...formData,
-          readme_content: compiledMarkdown
+          generated_readme: generatedMarkdown
         });
-        setFormData(prev => ({ ...prev, readme_content: compiledMarkdown }));
+        setFormData(prev => ({ ...prev, generated_readme: generatedMarkdown }));
       } else {
         const { data: newProj } = await createProject({
           ...formData,
-          readme_content: compiledMarkdown
+          generated_readme: generatedMarkdown
         });
         if (newProj) {
           navigateTo('workspace', newProj.id);
         }
       }
+    }
 
+    // Stop loading modal after minimum delay for realistic experience
+    setTimeout(() => {
+      setShowLoading(false);
       setIsGenerating(false);
       setSuccessMsg(true);
       setTimeout(() => setSuccessMsg(false), 3000);
-    }, 6000);
+    }, 1500);
   };
 
   const handleImprove = async (instruction: string) => {
     setIsGenerating(true);
     
-    // Simulate AI improving the README
-    setTimeout(() => {
-      let suffix = `\n\n## 🛡️ Security Audit Note\n*This documentation has been enhanced based on instruction: "${instruction}"*\n\n- Cryptographic hashes checked weekly.\n- Zero-dependency verification enforced.`;
-      const improvedContent = formData.readme_content + suffix;
+    // Call backend API or compile enhancement locally
+    try {
+      const response = await fetch('http://localhost:5000/api/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.project_name,
+          description: formData.description,
+          techStack: formData.tech_stack,
+          features: formData.features,
+          instruction: instruction
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const improved = result.readme;
+        if (activeProjectId) {
+          await updateProject(activeProjectId, { generated_readme: improved });
+        }
+        setFormData(prev => ({ ...prev, generated_readme: improved }));
+      } else {
+        throw new Error('Enhancement call failed.');
+      }
+    } catch (err) {
+      // Local fallback append
+      const suffix = `\n\n## 🛡️ Security Audit Note\n*This documentation has been enhanced based on instruction: "${instruction}"*\n\n- Zero-dependency verification enforced.`;
+      const improvedContent = (formData.generated_readme || '') + suffix;
       
       if (activeProjectId) {
-        updateProject(activeProjectId, { readme_content: improvedContent });
+        await updateProject(activeProjectId, { generated_readme: improvedContent });
       }
-      setFormData(prev => ({ ...prev, readme_content: improvedContent }));
-      setIsGenerating(false);
-    }, 2000);
+      setFormData(prev => ({ ...prev, generated_readme: improvedContent }));
+    }
+    
+    setIsGenerating(false);
   };
 
   return (
@@ -233,6 +240,13 @@ export const WorkspacePage: React.FC = () => {
           </div>
         </div>
 
+        {dbError && (
+          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs font-semibold flex items-center gap-2 flex-shrink-0">
+            <Compass className="h-4 w-4" />
+            <span>Database Error: {dbError}. Syncing is paused.</span>
+          </div>
+        )}
+
         {successMsg && (
           <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg text-xs font-semibold flex items-center gap-2 flex-shrink-0">
             <Check className="h-4 w-4" />
@@ -245,8 +259,8 @@ export const WorkspacePage: React.FC = () => {
           {/* Left: Input parameters form */}
           <div className="lg:col-span-5 h-full overflow-hidden">
             <ConfigForm
-              formData={formData}
-              setFormData={setFormData}
+              formData={formData as any}
+              setFormData={setFormData as any}
               onGenerate={handleGenerate}
               isGenerating={isGenerating}
             />
@@ -255,8 +269,8 @@ export const WorkspacePage: React.FC = () => {
           {/* Right: Realistic Output Preview */}
           <div className="lg:col-span-7 h-full overflow-hidden">
             <PreviewPanel
-              content={formData.readme_content}
-              setContent={(val) => setFormData(prev => ({ ...prev, readme_content: val }))}
+              content={formData.generated_readme || ''}
+              setContent={(val) => setFormData(prev => ({ ...prev, generated_readme: val }))}
               onImprove={handleImprove}
               isGenerating={isGenerating}
             />

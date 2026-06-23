@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { RouterProvider, useRouter } from './lib/router';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { LandingPage } from './pages/LandingPage';
@@ -7,25 +7,42 @@ import { SignUpPage } from './pages/SignUpPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { WorkspacePage } from './pages/WorkspacePage';
 import { SettingsPage } from './pages/SettingsPage';
+import { FileCode2 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
-  const { page } = useRouter();
-  const { user } = useAuth();
+  const { page, navigateTo } = useRouter();
+  const { user, isLoading } = useAuth();
 
-  // Route guarding: Redirect to landing/signin if not logged in and trying to access dashboard/workspace/settings
-  const privatePages = ['dashboard', 'workspace', 'settings'];
-  const isPrivate = privatePages.includes(page);
+  // Handle Route Guard Redirects
+  useEffect(() => {
+    if (isLoading) return;
 
-  if (isPrivate && !user) {
-    // If not authenticated, force them to the Sign In page
-    return <SignInPage />;
-  }
+    const privatePages = ['dashboard', 'workspace', 'settings'];
+    const isPrivate = privatePages.includes(page);
 
-  // If authenticated and tries to open login/signup pages, redirect to dashboard
-  if (user && (page === 'signin' || page === 'signup')) {
-    // Page redirect will happen in useEffect or state change.
-    // For rendering, we can just return the dashboard view.
-    return <DashboardPage />;
+    if (isPrivate && !user) {
+      navigateTo('signin');
+    } else if (user && (page === 'signin' || page === 'signup' || page === 'landing')) {
+      navigateTo('dashboard');
+    }
+  }, [page, user, isLoading, navigateTo]);
+
+  // Loading Screen while verifying active sessions
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center relative overflow-hidden select-none">
+        <div className="absolute w-[300px] h-[300px] bg-accent/5 rounded-full filter blur-[100px] pointer-events-none animate-pulse" />
+        <div className="flex flex-col items-center gap-4 relative z-10">
+          <div className="h-14 w-14 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-center animate-bounce">
+            <FileCode2 className="h-7 w-7 text-accent" />
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-sm font-bold text-neutral-high tracking-tight">Initializing Workspace</span>
+            <span className="text-[10px] text-neutral-low/40">Synchronizing credentials and loading profiles...</span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   switch (page) {
@@ -57,3 +74,4 @@ function App() {
 }
 
 export default App;
+

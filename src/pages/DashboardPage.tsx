@@ -5,6 +5,7 @@ import { useRouter } from '../lib/router';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { GlassCard } from '../components/ui/GlassCard';
+import { isSupabaseConfigured } from '../lib/supabaseClient';
 import { 
   FileText, 
   Layers, 
@@ -32,7 +33,7 @@ export const DashboardPage: React.FC = () => {
   // Get all unique tech tags used across projects
   const uniqueTech = Array.from(
     new Set(projects.flatMap(p => p.tech_stack || []))
-  ).slice(0, 5);
+  );
 
   const totalTech = uniqueTech.length;
 
@@ -48,6 +49,7 @@ export const DashboardPage: React.FC = () => {
       return 'Recently';
     }
   };
+
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
@@ -122,11 +124,13 @@ export const DashboardPage: React.FC = () => {
                 Supabase Sync
               </span>
               <div className="flex items-center gap-1.5 mt-2">
-                <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
-                <span className="text-xs font-semibold text-emerald-400">PostgreSQL Connected</span>
+                <span className={`flex h-2 w-2 rounded-full ${isSupabaseConfigured ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
+                <span className={`text-xs font-semibold ${isSupabaseConfigured ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {isSupabaseConfigured ? 'PostgreSQL Connected' : 'Sandbox Mode (Local)'}
+                </span>
               </div>
             </div>
-            <div className="h-10 w-10 rounded-lg bg-emerald-500/5 border border-emerald-500/15 flex items-center justify-center text-emerald-500">
+            <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${isSupabaseConfigured ? 'bg-emerald-500/5 border border-emerald-500/15 text-emerald-500' : 'bg-amber-500/5 border border-amber-500/15 text-amber-500'}`}>
               <Database className="h-5 w-5" />
             </div>
           </GlassCard>

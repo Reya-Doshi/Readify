@@ -1,6 +1,7 @@
-import { supabase as realSupabase } from './supabase';
+import { supabase as realSupabase, isSupabaseConfigured as realIsSupabaseConfigured } from './supabase';
 
-export const isSupabaseConfigured = true;
+export const isSupabaseConfigured = realIsSupabaseConfigured;
 export const supabase = realSupabase;
 
-console.log('Readify connected to Supabase Database Client.');
+console.log('Readify Supabase client loaded. Configured:', isSupabaseConfigured);
+

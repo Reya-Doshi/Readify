@@ -156,7 +156,7 @@ export const SignUpPage: React.FC = () => {
           </div>
 
           {/* OAuth Buttons */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-2.5">
             <Button
               type="button"
               variant="secondary"
@@ -167,9 +167,9 @@ export const SignUpPage: React.FC = () => {
               }
               onClick={() => signInWithProvider('google')}
               disabled={isLoading}
-              className="text-xs py-2"
+              className="w-full text-xs py-2.5"
             >
-              Google
+              Continue with Google
             </Button>
             <Button
               type="button"
@@ -181,9 +181,9 @@ export const SignUpPage: React.FC = () => {
               }
               onClick={() => signInWithProvider('github')}
               disabled={isLoading}
-              className="text-xs py-2"
+              className="w-full text-xs py-2.5"
             >
-              GitHub
+              Continue with GitHub
             </Button>
           </div>
 

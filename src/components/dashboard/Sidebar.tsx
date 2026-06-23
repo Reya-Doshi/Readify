@@ -16,7 +16,7 @@ import {
 
 export const Sidebar: React.FC = () => {
   const { page, navigateTo } = useRouter();
-  const { user, signOut, isSandbox } = useAuth();
+  const { user, email, signOut, isSandbox } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   const navItems: { label: string; page: Page; icon: React.FC<any> }[] = [
@@ -116,7 +116,7 @@ export const Sidebar: React.FC = () => {
                 )}
                 <div className="flex flex-col overflow-hidden">
                   <span className="text-xs font-semibold text-neutral-high truncate">{user.username}</span>
-                  <span className="text-[10px] text-neutral-low/50 truncate">Developer</span>
+                  <span className="text-[9px] text-neutral-low/40 truncate">{email || 'Developer'}</span>
                 </div>
               </div>
               

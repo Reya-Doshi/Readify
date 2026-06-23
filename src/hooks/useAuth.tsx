@@ -1,5 +1,5 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 import type { Profile } from '../types/database';
 
 interface AuthContextType {
@@ -20,12 +20,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<Profile | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSandbox] = useState(!isSupabaseConfigured);
 
   // Initial user loading
   useEffect(() => {
-    if (isSupabaseConfigured) {
-      const getSessionAndProfile = async () => {
+    const getSessionAndProfile = async () => {
+      try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           setEmail(session.user.email || null);
@@ -40,203 +39,108 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             setUser({
               id: session.user.id,
-              username: session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'developer',
+              username: session.user.user_metadata?.user_name || session.user.user_metadata?.preferred_username || session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'developer',
               avatar_url: session.user.user_metadata?.avatar_url || null,
               theme: 'dark',
               created_at: new Date().toISOString(),
             });
           }
         }
+      } catch (err) {
+        console.error('Session load error:', err);
+      } finally {
         setIsLoading(false);
-      };
+      }
+    };
 
-      getSessionAndProfile();
+    getSessionAndProfile();
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
-        if (session?.user) {
-          setEmail(session.user.email || null);
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          
-          setUser((profile as Profile) || {
-            id: session.user.id,
-            username: session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'developer',
-            avatar_url: session.user.user_metadata?.avatar_url || null,
-            theme: 'dark',
-            created_at: new Date().toISOString(),
-          });
-        } else {
-          setUser(null);
-          setEmail(null);
-        }
-        setIsLoading(false);
-      });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
+      if (session?.user) {
+        setEmail(session.user.email || null);
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        setUser((profile as Profile) || {
+          id: session.user.id,
+          username: session.user.user_metadata?.user_name || session.user.user_metadata?.preferred_username || session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'developer',
+          avatar_url: session.user.user_metadata?.avatar_url || null,
+          theme: 'dark',
+          created_at: new Date().toISOString(),
+        });
+      } else {
+        setUser(null);
+        setEmail(null);
+      }
+      setIsLoading(false);
+    });
 
-      return () => {
-        subscription.unsubscribe();
-      };
-    } else {
-      // Sandbox Auth (LocalStorage fallback)
-      const checkLocalUser = () => {
-        const savedUser = localStorage.getItem('readify_sandbox_user');
-        const savedEmail = localStorage.getItem('readify_sandbox_email');
-        if (savedUser) {
-          setUser(JSON.parse(savedUser));
-          setEmail(savedEmail);
-        }
-        setIsLoading(false);
-      };
-      
-      const timer = setTimeout(checkLocalUser, 400);
-      return () => clearTimeout(timer);
-    }
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (emailVal: string, passwordVal: string, usernameVal: string) => {
     setIsLoading(true);
-    if (isSupabaseConfigured) {
-      const { error } = await supabase.auth.signUp({
-        email: emailVal,
-        password: passwordVal,
-        options: {
-          data: {
-            username: usernameVal,
-            avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${usernameVal}`,
-          }
+    const { error } = await supabase.auth.signUp({
+      email: emailVal,
+      password: passwordVal,
+      options: {
+        data: {
+          username: usernameVal,
+          avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${usernameVal}`,
         }
-      });
-      setIsLoading(false);
-      if (error) return { error: error.message };
-      return { error: null };
-    } else {
-      // Sandbox implementation
-      return new Promise<{ error: string | null }>((resolve) => {
-        setTimeout(() => {
-          const mockId = 'sandbox-uid-' + Math.random().toString(36).substr(2, 9);
-          const newProfile: Profile = {
-            id: mockId,
-            username: usernameVal,
-            avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${usernameVal}`,
-            theme: 'dark',
-            created_at: new Date().toISOString(),
-          };
-          localStorage.setItem('readify_sandbox_user', JSON.stringify(newProfile));
-          localStorage.setItem('readify_sandbox_email', emailVal);
-          setUser(newProfile);
-          setEmail(emailVal);
-          setIsLoading(false);
-          resolve({ error: null });
-        }, 1000);
-      });
-    }
+      }
+    });
+    setIsLoading(false);
+    if (error) return { error: error.message };
+    return { error: null };
   };
 
   const signIn = async (emailVal: string, passwordVal: string) => {
     setIsLoading(true);
-    if (isSupabaseConfigured) {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: emailVal,
-        password: passwordVal,
-      });
-      setIsLoading(false);
-      if (error) return { error: error.message };
-      return { error: null };
-    } else {
-      // Sandbox implementation
-      return new Promise<{ error: string | null }>((resolve) => {
-        setTimeout(() => {
-          const usernameVal = emailVal.split('@')[0] || 'dev_guest';
-          const existingUser = localStorage.getItem('readify_sandbox_user');
-          let newProfile: Profile;
-          
-          if (existingUser) {
-            newProfile = JSON.parse(existingUser);
-          } else {
-            newProfile = {
-              id: 'sandbox-uid-default',
-              username: usernameVal,
-              avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${usernameVal}`,
-              theme: 'dark',
-              created_at: new Date().toISOString(),
-            };
-            localStorage.setItem('readify_sandbox_user', JSON.stringify(newProfile));
-          }
-          localStorage.setItem('readify_sandbox_email', emailVal);
-          setUser(newProfile);
-          setEmail(emailVal);
-          setIsLoading(false);
-          resolve({ error: null });
-        }, 1000);
-      });
-    }
+    const { error } = await supabase.auth.signInWithPassword({
+      email: emailVal,
+      password: passwordVal,
+    });
+    setIsLoading(false);
+    if (error) return { error: error.message };
+    return { error: null };
   };
 
   const signOut = async () => {
     setIsLoading(true);
-    if (isSupabaseConfigured) {
-      await supabase.auth.signOut();
-    } else {
-      localStorage.removeItem('readify_sandbox_user');
-      localStorage.removeItem('readify_sandbox_email');
-    }
+    await supabase.auth.signOut();
     setUser(null);
     setEmail(null);
     setIsLoading(false);
   };
 
   const signInWithProvider = async (provider: 'google' | 'github') => {
-    if (isSupabaseConfigured) {
-      await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: window.location.origin
-        }
-      });
-    } else {
-      // Sandbox simulation
-      setIsLoading(true);
-      setTimeout(() => {
-        const usernameVal = `${provider}_developer`;
-        const newProfile: Profile = {
-          id: `sandbox-oauth-${provider}-${Math.random().toString(36).substr(2, 5)}`,
-          username: usernameVal,
-          avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${usernameVal}`,
-          theme: 'dark',
-          created_at: new Date().toISOString(),
-        };
-        localStorage.setItem('readify_sandbox_user', JSON.stringify(newProfile));
-        localStorage.setItem('readify_sandbox_email', `${usernameVal}@example.com`);
-        setUser(newProfile);
-        setEmail(`${usernameVal}@example.com`);
-        setIsLoading(false);
-      }, 800);
-    }
+    await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return { error: 'Not authenticated' };
 
-    if (isSupabaseConfigured) {
-      const { error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', user.id);
-      
-      if (!error) {
-        setUser({ ...user, ...updates });
-        return { error: null };
-      }
-      return { error: error.message };
-    } else {
-      // Sandbox implementation
-      const updatedProfile = { ...user, ...updates };
-      localStorage.setItem('readify_sandbox_user', JSON.stringify(updatedProfile));
-      setUser(updatedProfile);
+    const { error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', user.id);
+    
+    if (!error) {
+      setUser({ ...user, ...updates });
       return { error: null };
     }
+    return { error: error.message };
   };
 
   return (
@@ -245,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         email,
         isLoading,
-        isSandbox,
+        isSandbox: false,
         signUp,
         signIn,
         signOut,

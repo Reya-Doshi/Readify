@@ -5,6 +5,7 @@ import type { Profile } from '../types/database';
 interface AuthContextType {
   user: Profile | null;
   email: string | null;
+  providerToken: string | null;
   isLoading: boolean;
   isSandbox: boolean;
   signUp: (email: string, password: string, username: string) => Promise<{ error: string | null }>;
@@ -19,6 +20,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<Profile | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+  const [providerToken, setProviderToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Initial user loading
@@ -26,24 +28,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const getSessionAndProfile = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          setEmail(session.user.email || null);
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          
-          if (profile) {
-            setUser(profile as Profile);
+        if (session) {
+          let token = session.provider_token;
+          if (token) {
+            sessionStorage.setItem('readify_github_provider_token', token);
           } else {
-            setUser({
-              id: session.user.id,
-              username: session.user.user_metadata?.user_name || session.user.user_metadata?.preferred_username || session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'developer',
-              avatar_url: session.user.user_metadata?.avatar_url || null,
-              theme: 'dark',
-              created_at: new Date().toISOString(),
-            });
+            token = sessionStorage.getItem('readify_github_provider_token');
+          }
+          setProviderToken(token || null);
+
+          if (session.user) {
+            setEmail(session.user.email || null);
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+            
+            if (profile) {
+              setUser(profile as Profile);
+            } else {
+              setUser({
+                id: session.user.id,
+                username: session.user.user_metadata?.user_name || session.user.user_metadata?.preferred_username || session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'developer',
+                avatar_url: session.user.user_metadata?.avatar_url || null,
+                theme: 'dark',
+                created_at: new Date().toISOString(),
+              });
+            }
           }
         }
       } catch (err) {
@@ -56,24 +68,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     getSessionAndProfile();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
-      if (session?.user) {
-        setEmail(session.user.email || null);
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-        
-        setUser((profile as Profile) || {
-          id: session.user.id,
-          username: session.user.user_metadata?.user_name || session.user.user_metadata?.preferred_username || session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'developer',
-          avatar_url: session.user.user_metadata?.avatar_url || null,
-          theme: 'dark',
-          created_at: new Date().toISOString(),
-        });
+      if (session) {
+        let token = session.provider_token;
+        if (token) {
+          sessionStorage.setItem('readify_github_provider_token', token);
+        } else {
+          token = sessionStorage.getItem('readify_github_provider_token');
+        }
+        setProviderToken(token || null);
+
+        if (session.user) {
+          setEmail(session.user.email || null);
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          
+          setUser((profile as Profile) || {
+            id: session.user.id,
+            username: session.user.user_metadata?.user_name || session.user.user_metadata?.preferred_username || session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'developer',
+            avatar_url: session.user.user_metadata?.avatar_url || null,
+            theme: 'dark',
+            created_at: new Date().toISOString(),
+          });
+        }
       } else {
         setUser(null);
         setEmail(null);
+        setProviderToken(null);
+        sessionStorage.removeItem('readify_github_provider_token');
       }
       setIsLoading(false);
     });
@@ -116,6 +140,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
     setUser(null);
     setEmail(null);
+    setProviderToken(null);
+    sessionStorage.removeItem('readify_github_provider_token');
     setIsLoading(false);
   };
 
@@ -148,6 +174,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         email,
+        providerToken,
         isLoading,
         isSandbox: false,
         signUp,

@@ -33,18 +33,7 @@ export const useProjects = () => {
         if (savedProjects) {
           setProjects(JSON.parse(savedProjects));
         } else {
-          // Seed initial default project
-          const defaultProj: ReadmeProject = {
-            id: 'sandbox-readme-1',
-            project_name: 'Express Microservice API',
-            description: 'A boilerplate REST API with JSON Web Tokens and Express routing.',
-            tech_stack: ['Node.js', 'Express', 'JWT', 'MongoDB'],
-            features: ['Secure route guards', 'Input validation', 'Graceful shutdown'],
-            generated_readme: `# Express Microservice API\n\nA boilerplate REST API with JSON Web Tokens.\n\n## Tech Stack\n* Node.js\n* Express\n* JWT\n* MongoDB\n\n## Features\n* Secure route guards\n* Input validation\n* Graceful shutdown`,
-            created_at: new Date().toISOString(),
-          };
-          localStorage.setItem('readify_sandbox_readmes', JSON.stringify([defaultProj]));
-          setProjects([defaultProj]);
+          setProjects([]);
         }
       } catch (err) {
         console.error('LocalStorage fetch error:', err);

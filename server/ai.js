@@ -22,6 +22,7 @@ export async function generateReadme(data) {
 
  Project:
  ${data.name}
+ ${data.owner && data.repo ? `GitHub Repository: ${data.owner}/${data.repo}` : ""}
 
  Description:
  ${data.description}
@@ -37,8 +38,8 @@ export async function generateReadme(data) {
  Include:
  - Title
  - Description
- - Features
- - Installation
+ - Features (Focusing on the detected feature items)
+ - Installation (Generate actual setup and clone commands like \`git clone https://github.com/${data.owner || 'owner'}/${data.repo || 'repo'}.git\` based on the technologies)
  - Usage
  - Tech Stack
  - License
@@ -47,7 +48,7 @@ export async function generateReadme(data) {
  - Return ONLY raw markdown content. Do NOT wrap the entire output in triple backticks (e.g. do not wrap in \`\`\`markdown and \`\`\`).
  - Use standard markdown formatting (headers, tables, badges, codeblocks).
  - Tone should be minimal, premium and professional.
- `;
+  `;
 
   const result = await model.generateContent(prompt);
   let readmeText = result.response.text();

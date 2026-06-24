@@ -65,8 +65,9 @@ export const DashboardPage: React.FC = () => {
       project_name: repo.name,
       description: repo.description || `GitHub repository for ${repo.name}.`,
       tech_stack: repo.language ? [repo.language] : [],
-      features: ['Automatic documentation setup', 'GitHub repository synchronization'],
-      generated_readme: `# 🌐 ${repo.name}\n\n${repo.description || ''}\n\n## 🛠️ Tech Stack\n* ${repo.language || 'Not specified'}\n\n## 📦 Installation\n\`\`\`bash\ngit clone ${repo.html_url}.git\ncd ${repo.name}\nnpm install\n\`\`\``
+      features: [],
+      generated_readme: '',
+      github_url: repo.html_url
     });
 
     if (saveError) {

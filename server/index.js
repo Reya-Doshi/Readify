@@ -52,11 +52,8 @@ app.post("/api/generate", async (req, res) => {
         const { data, error } = await supabase
           .from("readmes")
           .update({
-            project_name: name,
-            description,
-            tech_stack: techStack,
-            features,
-            generated_readme: markdown
+            repo_name: name,
+            markdown_content: markdown
           })
           .eq("id", id)
           .select()
@@ -72,11 +69,8 @@ app.post("/api/generate", async (req, res) => {
         const { data, error } = await supabase
           .from("readmes")
           .insert({
-            project_name: name,
-            description,
-            tech_stack: techStack,
-            features,
-            generated_readme: markdown
+            repo_name: name,
+            markdown_content: markdown
           })
           .select()
           .single();

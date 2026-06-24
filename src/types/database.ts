@@ -14,4 +14,6 @@ export interface ReadmeProject {
   features: string[] | null;
   generated_readme: string | null;
   created_at: string;
+  github_url?: string | null;
 }
+

@@ -83,12 +83,14 @@ export const useProjects = () => {
 
     if (isSupabaseConfigured && supabase) {
       try {
+        const { data: { user } } = await supabase.auth.getUser();
         const { data, error: dbError } = await supabase
           .from('readmes')
           .insert({
             repo_name: projectData.project_name,
             github_url: projectData.github_url || null,
             markdown_content: projectData.generated_readme,
+            user_id: user?.id || null
           })
           .select('id, created_at, user_id, repo_name, github_url, markdown_content')
           .single();

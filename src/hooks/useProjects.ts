@@ -2,10 +2,20 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import type { ReadmeProject } from '../types/database';
 
-// Helper to format Postgres and PostgREST schema mismatch errors
+// Helper to format Postgres and PostgREST schema mismatch and RLS permission errors
 const handleDbError = (err: any, fallbackMessage: string): string => {
-  console.error('Supabase query error details:', err);
+  console.error('Detailed Supabase query error:', {
+    code: err.code,
+    message: err.message,
+    details: err.details,
+    hint: err.hint,
+    originalError: err
+  });
+  
   const code = err.code;
+  if (code === '42501') {
+    return 'Database Permission Denied: Your user session is not permitted to perform this operation. Please verify your Supabase Row Level Security (RLS) policies.';
+  }
   if (code === 'PGRST204' || code === '42703') {
     return 'Database Schema Mismatch: The requested column does not exist in the Supabase table. Please verify your table migrations.';
   }
@@ -26,6 +36,13 @@ export const useProjects = () => {
 
     if (isSupabaseConfigured && supabase) {
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setProjects([]);
+          setIsLoading(false);
+          return;
+        }
+
         const { data, error: dbError } = await supabase
           .from('readmes')
           .select('id, created_at, user_id, repo_name, github_url, markdown_content')
@@ -84,13 +101,17 @@ export const useProjects = () => {
     if (isSupabaseConfigured && supabase) {
       try {
         const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error('Authenticated user session not found. Please log in again.');
+        }
+
         const { data, error: dbError } = await supabase
           .from('readmes')
           .insert({
             repo_name: projectData.project_name,
             github_url: projectData.github_url || null,
             markdown_content: projectData.generated_readme,
-            user_id: user?.id || null
+            user_id: user.id
           })
           .select('id, created_at, user_id, repo_name, github_url, markdown_content')
           .single();
@@ -137,6 +158,11 @@ export const useProjects = () => {
 
     if (isSupabaseConfigured && supabase) {
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error('Authenticated user session not found. Please log in again.');
+        }
+
         const dbUpdates: any = {};
         if (updates.project_name !== undefined) {
           dbUpdates.repo_name = updates.project_name;
@@ -194,6 +220,11 @@ export const useProjects = () => {
 
     if (isSupabaseConfigured && supabase) {
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error('Authenticated user session not found. Please log in again.');
+        }
+
         const { error: dbError } = await supabase
           .from('readmes')
           .delete()

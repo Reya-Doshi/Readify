@@ -122,3 +122,33 @@ INSERT INTO public.templates (name, description, settings) VALUES
 ('Open-Source Package', 'Full documentation template with extensive contribution guides, build systems, badges, and badges.', '{"style":"open-source","techStack":["React","TypeScript","Vite"],"features":["Modular Components","TS Type-Safe","ESLint and Prettier"],"advanced":{"includeBadges":true,"includeInstallation":true,"includeApiDocs":false,"includeArchitecture":true,"includeContribution":true,"includeLicense":true}}'),
 ('SaaS Startup Landing', 'FSE-ready project document including interactive features lists, tech stack breakdowns, and architecture outline.', '{"style":"startup","techStack":["Next.js","Tailwind CSS","Supabase"],"features":["Supabase Authentication","RLS PostgreSQL","Responsive UI Dashboard"],"advanced":{"includeBadges":true,"includeInstallation":true,"includeApiDocs":true,"includeArchitecture":true,"includeContribution":false,"includeLicense":true}}')
 ON CONFLICT DO NOTHING;
+
+
+-- ==========================================
+-- 4. Readmes Table (Generated README files)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.readmes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    user_id UUID REFERENCES auth.users ON DELETE CASCADE DEFAULT auth.uid(),
+    repo_name TEXT NOT NULL,
+    github_url TEXT,
+    markdown_content TEXT
+);
+
+-- Enable RLS for Readmes
+ALTER TABLE public.readmes ENABLE ROW LEVEL SECURITY;
+
+-- Readmes Policies
+CREATE POLICY "Users can view their own readmes" ON public.readmes
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own readmes" ON public.readmes
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own readmes" ON public.readmes
+    FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own readmes" ON public.readmes
+    FOR DELETE USING (auth.uid() = user_id);
+

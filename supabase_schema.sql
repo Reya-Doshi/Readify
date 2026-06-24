@@ -152,3 +152,11 @@ CREATE POLICY "Users can update their own readmes" ON public.readmes
 CREATE POLICY "Users can delete their own readmes" ON public.readmes
     FOR DELETE USING (auth.uid() = user_id);
 
+-- Migration updates to add new columns if they do not exist
+ALTER TABLE public.readmes ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.readmes ADD COLUMN IF NOT EXISTS tech_stack TEXT[];
+ALTER TABLE public.readmes ADD COLUMN IF NOT EXISTS features TEXT[];
+ALTER TABLE public.readmes ADD COLUMN IF NOT EXISTS repo_metadata JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.readmes ADD COLUMN IF NOT EXISTS analysis_results JSONB DEFAULT '{}'::jsonb;
+
+

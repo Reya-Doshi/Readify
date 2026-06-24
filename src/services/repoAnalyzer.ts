@@ -1,4 +1,8 @@
-export interface AnalysisResult {
+export interface RepoProfile {
+  name: string;
+  owner: string;
+  description: string;
+  githubUrl: string;
   stats: {
     stars: number;
     forks: number;
@@ -6,13 +10,27 @@ export interface AnalysisResult {
     size: number;
   };
   languages: string[];
-  frameworks: string[];
-  libraries: string[];
-  databases: string[];
-  authProviders: string[];
-  aiServices: string[];
-  deploymentConfigs: string[];
+  packageManager: string | null;
+  projectType: 'static' | 'react-vite' | 'nextjs' | 'nodejs' | 'python' | 'java' | 'rust' | 'php' | 'docker' | 'unknown';
+  
+  // Structured categories
+  frontendFramework: string | null;
+  backendFramework: string | null;
+  database: string | null;
+  orm: string | null;
+  authentication: string | null;
+  aiServices: string | null;
+  deploymentPlatform: string | null;
+  testingFramework: string | null;
+  
+  // Repository structure
+  fileTree: string[];
+  configFiles: string[];
+  
+  // Custom generated metadata
   suggestedFeatures: string[];
+  installationInstructions: string;
+  usageInstructions: string;
 }
 
 // Parse owner and repo name from GitHub URL
@@ -24,12 +42,37 @@ export const parseGithubUrl = (url: string) => {
   return null;
 };
 
+// Helper to fetch file content raw from GitHub API
+export const fetchFileContentRaw = async (
+  owner: string,
+  repo: string,
+  path: string,
+  token: string | null
+): Promise<string | null> => {
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+  const headers: Record<string, string> = {
+    'Accept': 'application/vnd.github.v3.raw',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  try {
+    const res = await fetch(url, { headers });
+    if (res.ok) {
+      return await res.text();
+    }
+  } catch (err) {
+    console.error(`Error fetching file content for ${path}:`, err);
+  }
+  return null;
+};
+
 // Main analyze function
 export const analyzeRepository = async (
   owner: string,
   repo: string,
   token: string | null
-): Promise<AnalysisResult> => {
+): Promise<RepoProfile> => {
   const headers: Record<string, string> = {
     'Accept': 'application/vnd.github.v3+json',
   };
@@ -37,28 +80,41 @@ export const analyzeRepository = async (
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // Base structures
+  // Baseline variables
+  let repoName = repo;
+  let description = '';
+  let githubUrl = `https://github.com/${owner}/${repo}`;
   let stars = 0;
   let forks = 0;
   let issues = 0;
   let size = 0;
+  let defaultBranch = 'main';
   let languagesList: string[] = [];
-  let frameworks: string[] = [];
-  let libraries: string[] = [];
-  let databases: string[] = [];
-  let authProviders: string[] = [];
-  let aiServices: string[] = [];
-  let deploymentConfigs: string[] = [];
+  
+  // Category detections
+  let frontendFramework: string | null = null;
+  let backendFramework: string | null = null;
+  let database: string | null = null;
+  let orm: string | null = null;
+  let authentication: string | null = null;
+  let aiServices: string | null = null;
+  let deploymentPlatform: string | null = null;
+  let testingFramework: string | null = null;
+  let packageManager: string | null = null;
+  let projectType: RepoProfile['projectType'] = 'unknown';
 
+  // 1. Fetch Repository Metadata
   try {
-    // 1. Fetch Repository Metadata
     const repoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
     if (repoResponse.ok) {
       const repoData = await repoResponse.json();
+      repoName = repoData.name || repo;
+      description = repoData.description || '';
       stars = repoData.stargazers_count || 0;
       forks = repoData.forks_count || 0;
       issues = repoData.open_issues_count || 0;
       size = repoData.size || 0;
+      defaultBranch = repoData.default_branch || 'main';
       if (repoData.language && !languagesList.includes(repoData.language)) {
         languagesList.push(repoData.language);
       }
@@ -67,13 +123,12 @@ export const analyzeRepository = async (
     console.error('Error fetching repo metadata:', err);
   }
 
+  // 2. Fetch Languages
   try {
-    // 2. Fetch Languages
     const langResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/languages`, { headers });
     if (langResponse.ok) {
       const langData = await langResponse.json();
-      const detectedLangs = Object.keys(langData);
-      detectedLangs.forEach(l => {
+      Object.keys(langData).forEach(l => {
         if (!languagesList.includes(l)) {
           languagesList.push(l);
         }
@@ -83,157 +138,445 @@ export const analyzeRepository = async (
     console.error('Error fetching repo languages:', err);
   }
 
-  // 3. Fetch Root Contents
-  let rootFiles: any[] = [];
+  // 3. Fetch File Tree (Try recursive tree first)
+  let fileTreePaths: string[] = [];
+  let gitTreeFetched = false;
   try {
-    const contentsResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents`, { headers });
-    if (contentsResponse.ok) {
-      rootFiles = await contentsResponse.json();
+    const treeResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`, { headers });
+    if (treeResponse.ok) {
+      const treeData = await treeResponse.json();
+      if (treeData.tree && Array.isArray(treeData.tree)) {
+        fileTreePaths = treeData.tree.map((node: any) => node.path);
+        gitTreeFetched = true;
+      }
     }
   } catch (err) {
-    console.error('Error fetching root contents:', err);
+    console.error('Error fetching recursive git tree:', err);
   }
 
-  // Check file presence
-  const fileMap = new Map<string, string>();
-  rootFiles.forEach(file => {
-    if (file.type === 'file') {
-      fileMap.set(file.name.toLowerCase(), file.download_url || file.url);
+  // Fallback to root contents if Git Trees failed or was truncated
+  if (!gitTreeFetched) {
+    try {
+      const contentsResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents`, { headers });
+      if (contentsResponse.ok) {
+        const rootContents = await contentsResponse.json();
+        fileTreePaths = rootContents.map((node: any) => node.path);
+      }
+    } catch (err) {
+      console.error('Error fetching root contents fallback:', err);
+    }
+  }
+
+  // Convert file list to lower case set for instant checks
+  const fileSet = new Set<string>(fileTreePaths.map(p => p.toLowerCase()));
+  const configFiles: string[] = [];
+
+  // Lockfile scans to detect Package Manager
+  if (fileSet.has('package-lock.json')) {
+    packageManager = 'npm';
+    configFiles.push('package-lock.json');
+  } else if (fileSet.has('yarn.lock')) {
+    packageManager = 'yarn';
+    configFiles.push('yarn.lock');
+  } else if (fileSet.has('pnpm-lock.yaml')) {
+    packageManager = 'pnpm';
+    configFiles.push('pnpm-lock.yaml');
+  }
+
+  // Scan root config files
+  const possibleConfigs = [
+    'package.json', 'requirements.txt', 'pyproject.toml', 'cargo.toml', 
+    'pom.xml', 'build.gradle', 'composer.json', 'dockerfile', 
+    'docker-compose.yml', 'tsconfig.json', 'vite.config.ts', 
+    'vite.config.js', 'next.config.js', 'next.config.mjs', 
+    'next.config.ts', 'tailwind.config.js', 'tailwind.config.ts', 
+    'prisma/schema.prisma', 'readme.md'
+  ];
+  possibleConfigs.forEach(cfg => {
+    // Check if the set contains the config path
+    if (fileSet.has(cfg)) {
+      configFiles.push(cfg);
     }
   });
 
-  // Check specific files for stack detection
-  if (fileMap.has('dockerfile') || fileMap.has('docker-compose.yml')) {
-    deploymentConfigs.push('Docker');
-  }
-  if (fileMap.has('vercel.json')) {
-    deploymentConfigs.push('Vercel');
-  }
-  if (fileMap.has('netlify.toml')) {
-    deploymentConfigs.push('Netlify');
-  }
-  if (fileMap.has('go.mod')) {
-    if (!languagesList.includes('Go')) languagesList.push('Go');
-  }
-  if (fileMap.has('cargo.toml')) {
-    if (!languagesList.includes('Rust')) languagesList.push('Rust');
-  }
-  if (fileMap.has('requirements.txt') || fileMap.has('pyproject.toml')) {
-    if (!languagesList.includes('Python')) languagesList.push('Python');
-  }
+  // Check subdirectories or full paths for Prisma and other configs
+  fileTreePaths.forEach(p => {
+    const lower = p.toLowerCase();
+    if (lower.endsWith('schema.prisma') && !configFiles.includes(p)) {
+      configFiles.push(p);
+      orm = 'Prisma';
+    }
+    if (lower.endsWith('dockerfile') && !configFiles.includes(p)) {
+      configFiles.push(p);
+      deploymentPlatform = 'Docker';
+    }
+    if (lower.includes('docker-compose') && !configFiles.includes(p)) {
+      configFiles.push(p);
+      deploymentPlatform = 'Docker';
+    }
+  });
 
-  // Analyze package.json dependencies
-  const packageJsonUrl = fileMap.get('package.json');
-  if (packageJsonUrl) {
-    try {
-      const pkgResponse = await fetch(packageJsonUrl, { headers });
-      if (pkgResponse.ok) {
-        const pkgData = await pkgResponse.json();
-        const deps = { ...pkgData.dependencies, ...pkgData.devDependencies };
-        
-        // Run package check
-        Object.keys(deps).forEach(name => {
-          // Frameworks
-          if (name === 'react' && !frameworks.includes('React')) frameworks.push('React');
-          if (name === 'next' && !frameworks.includes('Next.js')) frameworks.push('Next.js');
-          if (name === 'express' && !frameworks.includes('Express')) frameworks.push('Express');
-          if (name.includes('nestjs') && !frameworks.includes('NestJS')) frameworks.push('NestJS');
-          if (name === 'vue' && !frameworks.includes('Vue')) frameworks.push('Vue');
-          if (name === 'nuxt' && !frameworks.includes('Nuxt')) frameworks.push('Nuxt');
-          if ((name === 'svelte' || name.includes('svelte-kit')) && !frameworks.includes('Svelte')) frameworks.push('Svelte');
-          if (name.includes('astro') && !frameworks.includes('Astro')) frameworks.push('Astro');
-          if (name.includes('remix-run') && !frameworks.includes('Remix')) frameworks.push('Remix');
+  // Read manifest file contents if present to identify specific packages
+  if (fileSet.has('package.json')) {
+    const content = await fetchFileContentRaw(owner, repo, 'package.json', token);
+    if (content) {
+      try {
+        const pkg = JSON.parse(content);
+        const deps = { ...pkg.dependencies, ...pkg.devDependencies };
 
-          // Libraries
-          if (name === 'tailwindcss' && !libraries.includes('Tailwind CSS')) libraries.push('Tailwind CSS');
-          if (name === 'bootstrap' && !libraries.includes('Bootstrap')) libraries.push('Bootstrap');
-          if (name === 'framer-motion' && !libraries.includes('Framer Motion')) libraries.push('Framer Motion');
-          if (name === 'lucide-react' && !libraries.includes('Lucide React')) libraries.push('Lucide React');
-          if ((name === 'redux' || name.includes('redux-toolkit')) && !libraries.includes('Redux')) libraries.push('Redux');
-          if (name === 'zustand' && !libraries.includes('Zustand')) libraries.push('Zustand');
-          if (name === 'axios' && !libraries.includes('Axios')) libraries.push('Axios');
-          if (name === 'lodash' && !libraries.includes('Lodash')) libraries.push('Lodash');
+        // Frameworks
+        if (deps['next']) {
+          frontendFramework = 'Next.js';
+          projectType = 'nextjs';
+        } else if (deps['react']) {
+          frontendFramework = 'React';
+          if (fileSet.has('vite.config.ts') || fileSet.has('vite.config.js') || fileSet.has('vite.config.mjs')) {
+            projectType = 'react-vite';
+          } else {
+            projectType = 'nodejs';
+          }
+        } else if (deps['vue']) {
+          frontendFramework = 'Vue';
+          if (deps['nuxt']) frontendFramework = 'Nuxt.js';
+          projectType = 'nodejs';
+        } else if (deps['svelte'] || deps['@sveltejs/kit']) {
+          frontendFramework = 'Svelte';
+          projectType = 'nodejs';
+        }
 
-          // Database
-          if ((name === 'pg' || name === 'postgres') && !databases.includes('PostgreSQL')) databases.push('PostgreSQL');
-          if ((name === 'mysql' || name === 'mysql2') && !databases.includes('MySQL')) databases.push('MySQL');
-          if ((name === 'mongodb' || name === 'mongoose') && !databases.includes('MongoDB')) databases.push('MongoDB');
-          if (name === 'redis' && !databases.includes('Redis')) databases.push('Redis');
-          if (name === 'sqlite3' && !databases.includes('SQLite')) databases.push('SQLite');
-          if ((name === '@prisma/client' || name === 'prisma') && !databases.includes('Prisma (ORM)')) databases.push('Prisma (ORM)');
-          if (name === 'sequelize' && !databases.includes('Sequelize (ORM)')) databases.push('Sequelize (ORM)');
-          if (name === 'typeorm' && !databases.includes('TypeORM')) databases.push('TypeORM');
+        if (deps['express']) {
+          backendFramework = 'Express';
+          if (projectType === 'unknown') projectType = 'nodejs';
+        } else if (deps['@nestjs/core']) {
+          backendFramework = 'NestJS';
+          if (projectType === 'unknown') projectType = 'nodejs';
+        } else if (deps['koa']) {
+          backendFramework = 'Koa';
+          if (projectType === 'unknown') projectType = 'nodejs';
+        }
 
-          // Auth
-          if ((name === 'next-auth' || name.includes('@auth/')) && !authProviders.includes('NextAuth')) authProviders.push('NextAuth');
-          if (name === '@supabase/supabase-js' && !authProviders.includes('Supabase Auth')) authProviders.push('Supabase Auth');
-          if (name.includes('firebase') && !authProviders.includes('Firebase Auth')) authProviders.push('Firebase Auth');
-          if (name === 'jsonwebtoken' && !authProviders.includes('JWT')) authProviders.push('JWT');
-          if (name.includes('passport') && !authProviders.includes('Passport.js')) authProviders.push('Passport.js');
-          if (name.includes('clerk') && !authProviders.includes('Clerk')) authProviders.push('Clerk');
-          if (name.includes('auth0') && !authProviders.includes('Auth0')) authProviders.push('Auth0');
+        // Databases
+        if (deps['pg'] || deps['postgres']) database = 'PostgreSQL';
+        else if (deps['mysql'] || deps['mysql2']) database = 'MySQL';
+        else if (deps['mongodb'] || deps['mongoose']) database = 'MongoDB';
+        else if (deps['redis']) database = 'Redis';
+        else if (deps['sqlite3']) database = 'SQLite';
 
-          // AI
-          if (name === '@google/generative-ai' && !aiServices.includes('Gemini AI')) aiServices.push('Gemini AI');
-          if (name === 'openai' && !aiServices.includes('OpenAI')) aiServices.push('OpenAI');
-          if (name.includes('langchain') && !aiServices.includes('LangChain')) aiServices.push('LangChain');
-          if (name.includes('pinecone') && !aiServices.includes('Pinecone')) aiServices.push('Pinecone');
+        // ORMs
+        if (deps['prisma'] || deps['@prisma/client']) orm = 'Prisma';
+        else if (deps['sequelize']) orm = 'Sequelize';
+        else if (deps['typeorm']) orm = 'TypeORM';
+        else if (deps['mongoose']) orm = 'Mongoose';
 
-          // Deployment
-          if (name === 'vercel' && !deploymentConfigs.includes('Vercel')) deploymentConfigs.push('Vercel');
-          if (name === 'netlify' && !deploymentConfigs.includes('Netlify')) deploymentConfigs.push('Netlify');
-          if (name === 'pm2' && !deploymentConfigs.includes('PM2')) deploymentConfigs.push('PM2');
-        });
+        // Authentication
+        if (deps['next-auth'] || deps['@auth/core']) authentication = 'NextAuth';
+        else if (deps['@supabase/supabase-js']) authentication = 'Supabase Auth';
+        else if (deps['firebase'] || deps['firebase-admin']) authentication = 'Firebase Auth';
+        else if (deps['jsonwebtoken']) authentication = 'JWT';
+        else if (deps['clerk'] || deps['@clerk/nextjs']) authentication = 'Clerk';
+        else if (deps['auth0'] || deps['@auth0/nextjs-auth0']) authentication = 'Auth0';
+        else if (deps['passport']) authentication = 'Passport.js';
+
+        // AI Services
+        if (deps['@google/generative-ai']) aiServices = 'Gemini AI';
+        else if (deps['openai']) aiServices = 'OpenAI';
+        else if (deps['langchain']) aiServices = 'LangChain';
+        else if (deps['@pinecone-database/pinecone']) aiServices = 'Pinecone';
+
+        // Deployment Platform
+        if (deps['vercel']) deploymentPlatform = 'Vercel';
+        else if (deps['netlify'] || deps['netlify-cli']) deploymentPlatform = 'Netlify';
+
+        // Testing
+        if (deps['jest']) testingFramework = 'Jest';
+        else if (deps['vitest']) testingFramework = 'Vitest';
+        else if (deps['cypress']) testingFramework = 'Cypress';
+        else if (deps['playwright'] || deps['@playwright/test']) testingFramework = 'Playwright';
+        else if (deps['mocha']) testingFramework = 'Mocha';
+
+        if (projectType === 'unknown') {
+          projectType = 'nodejs';
+        }
+      } catch (err) {
+        console.error('Failed to parse package.json dependencies:', err);
       }
-    } catch (err) {
-      console.error('Error reading package.json:', err);
     }
   }
 
-  // Suggest features based on stack elements
-  const suggestedFeatures: string[] = [];
-  if (frameworks.includes('React') || frameworks.includes('Vue') || frameworks.includes('Svelte') || frameworks.includes('Next.js')) {
-    suggestedFeatures.push('Responsive, state-driven client user interface');
-    suggestedFeatures.push('Component-driven frontend layout architecture');
-  }
-  if (frameworks.includes('Next.js') || frameworks.includes('Nuxt') || frameworks.includes('Remix')) {
-    suggestedFeatures.push('Server-Side Rendering (SSR) and Static Site Generation (SSG)');
-    suggestedFeatures.push('Integrated serverless API endpoints and route optimization');
-  }
-  if (frameworks.includes('Express') || frameworks.includes('NestJS') || frameworks.includes('FastAPI') || languagesList.includes('Go') || languagesList.includes('Rust')) {
-    suggestedFeatures.push('RESTful API controllers and server router logic');
-  }
-  if (databases.length > 0) {
-    suggestedFeatures.push('Persistent structured data modeling and indexing');
-  }
-  if (authProviders.length > 0) {
-    suggestedFeatures.push('Secure user registration, password hashing, and session authentication');
-  }
-  if (aiServices.length > 0) {
-    suggestedFeatures.push('Generative AI integration and large language model prompts execution');
-  }
-  if (deploymentConfigs.includes('Docker')) {
-    suggestedFeatures.push('Containerized Docker and local environment setup files');
-  }
-  if (languagesList.includes('TypeScript')) {
-    suggestedFeatures.push('Strict compile-time type-checking and interface validation');
+  // Python Detections
+  if (projectType === 'unknown' && (fileSet.has('requirements.txt') || fileSet.has('pyproject.toml'))) {
+    projectType = 'python';
+    packageManager = 'pip';
+    let requirementsContent = '';
+    
+    if (fileSet.has('requirements.txt')) {
+      const content = await fetchFileContentRaw(owner, repo, 'requirements.txt', token);
+      requirementsContent = content || '';
+    } else if (fileSet.has('pyproject.toml')) {
+      const content = await fetchFileContentRaw(owner, repo, 'pyproject.toml', token);
+      requirementsContent = content || '';
+      if (requirementsContent.includes('poetry')) {
+        packageManager = 'poetry';
+      }
+    }
+
+    if (requirementsContent) {
+      const reqLower = requirementsContent.toLowerCase();
+      if (reqLower.includes('django')) backendFramework = 'Django';
+      else if (reqLower.includes('flask')) backendFramework = 'Flask';
+      else if (reqLower.includes('fastapi')) backendFramework = 'FastAPI';
+
+      if (reqLower.includes('psycopg2') || reqLower.includes('postgresql')) database = 'PostgreSQL';
+      else if (reqLower.includes('pymongo')) database = 'MongoDB';
+      else if (reqLower.includes('mysqlclient')) database = 'MySQL';
+      else if (reqLower.includes('redis')) database = 'Redis';
+
+      if (reqLower.includes('sqlalchemy')) orm = 'SQLAlchemy';
+      else if (reqLower.includes('django.db')) orm = 'Django ORM';
+
+      if (reqLower.includes('google-generativeai')) aiServices = 'Gemini AI';
+      else if (reqLower.includes('openai')) aiServices = 'OpenAI';
+      else if (reqLower.includes('langchain')) aiServices = 'LangChain';
+
+      if (reqLower.includes('pytest')) testingFramework = 'pytest';
+      else if (reqLower.includes('unittest')) testingFramework = 'unittest';
+    }
   }
 
-  // Fallback features if empty
-  if (suggestedFeatures.length === 0) {
-    suggestedFeatures.push('Clean directory structuring and separation of concerns');
-    suggestedFeatures.push('Flexible environment configurations for localized builds');
+  // Rust Detections
+  if (projectType === 'unknown' && fileSet.has('cargo.toml')) {
+    projectType = 'rust';
+    packageManager = 'cargo';
+    const content = await fetchFileContentRaw(owner, repo, 'cargo.toml', token);
+    if (content) {
+      const cargoLower = content.toLowerCase();
+      if (cargoLower.includes('actix-web')) backendFramework = 'Actix-web';
+      else if (cargoLower.includes('axum')) backendFramework = 'Axum';
+      else if (cargoLower.includes('rocket')) backendFramework = 'Rocket';
+
+      if (cargoLower.includes('postgres') || cargoLower.includes('tokio-postgres')) database = 'PostgreSQL';
+      else if (cargoLower.includes('mysql')) database = 'MySQL';
+      else if (cargoLower.includes('redis')) database = 'Redis';
+
+      if (cargoLower.includes('sqlx')) orm = 'SQLx';
+      else if (cargoLower.includes('diesel')) orm = 'Diesel';
+    }
   }
+
+  // Java Detections
+  if (projectType === 'unknown' && (fileSet.has('pom.xml') || fileSet.has('build.gradle'))) {
+    projectType = 'java';
+    let content = '';
+    if (fileSet.has('pom.xml')) {
+      packageManager = 'mvn';
+      content = (await fetchFileContentRaw(owner, repo, 'pom.xml', token)) || '';
+    } else {
+      packageManager = 'gradle';
+      content = (await fetchFileContentRaw(owner, repo, 'build.gradle', token)) || '';
+    }
+
+    if (content) {
+      const javaLower = content.toLowerCase();
+      if (javaLower.includes('spring-boot')) backendFramework = 'Spring Boot';
+      else if (javaLower.includes('micronaut')) backendFramework = 'Micronaut';
+      else if (javaLower.includes('quarkus')) backendFramework = 'Quarkus';
+
+      if (javaLower.includes('postgresql') || javaLower.includes('r2dbc-postgresql')) database = 'PostgreSQL';
+      else if (javaLower.includes('mysql-connector')) database = 'MySQL';
+      else if (javaLower.includes('h2')) database = 'H2 (In-Memory)';
+
+      if (javaLower.includes('hibernate') || javaLower.includes('spring-data-jpa')) orm = 'Hibernate / JPA';
+
+      if (javaLower.includes('junit')) testingFramework = 'JUnit';
+      else if (javaLower.includes('testng')) testingFramework = 'TestNG';
+    }
+  }
+
+  // PHP Detections
+  if (projectType === 'unknown' && fileSet.has('composer.json')) {
+    projectType = 'php';
+    packageManager = 'composer';
+    const content = await fetchFileContentRaw(owner, repo, 'composer.json', token);
+    if (content) {
+      try {
+        const composer = JSON.parse(content);
+        const reqs = composer.require || {};
+        if (reqs['laravel/framework']) backendFramework = 'Laravel';
+        else if (reqs['symfony/symfony']) backendFramework = 'Symfony';
+        
+        if (reqs['phpunit/phpunit']) testingFramework = 'PHPUnit';
+      } catch (err) {
+        console.error('Failed to parse composer.json:', err);
+      }
+    }
+  }
+
+  // Static HTML project identification
+  if (projectType === 'unknown' && fileSet.has('index.html')) {
+    // If it has index.html and none of the other backend/build config files are present
+    const hasBackendsOrFrameworks = 
+      fileSet.has('package.json') || 
+      fileSet.has('requirements.txt') || 
+      fileSet.has('pyproject.toml') || 
+      fileSet.has('cargo.toml') || 
+      fileSet.has('pom.xml') || 
+      fileSet.has('build.gradle') || 
+      fileSet.has('composer.json') || 
+      fileSet.has('go.mod');
+      
+    if (!hasBackendsOrFrameworks) {
+      projectType = 'static';
+      packageManager = null;
+    }
+  }
+
+  // Dockerized project override
+  if (fileSet.has('dockerfile') || fileSet.has('docker-compose.yml')) {
+    deploymentPlatform = 'Docker';
+  }
+
+  // Default package manager fallback if Node.js detected but no lockfiles
+  if (projectType === 'nodejs' || projectType === 'react-vite' || projectType === 'nextjs') {
+    if (!packageManager) packageManager = 'npm';
+  }
+
+  // Ensure default fallback language if empty
+  if (languagesList.length === 0) {
+    if (projectType === 'nodejs' || projectType === 'react-vite' || projectType === 'nextjs') {
+      languagesList = ['JavaScript'];
+    } else if (projectType === 'python') {
+      languagesList = ['Python'];
+    } else if (projectType === 'java') {
+      languagesList = ['Java'];
+    } else if (projectType === 'rust') {
+      languagesList = ['Rust'];
+    } else if (projectType === 'php') {
+      languagesList = ['PHP'];
+    } else if (projectType === 'static') {
+      languagesList = ['HTML', 'CSS'];
+    } else {
+      languagesList = ['JavaScript'];
+    }
+  }
+
+  // Feature suggestions list
+  const suggestedFeatures: string[] = [];
+  if (frontendFramework === 'Next.js' || frontendFramework === 'Nuxt.js') {
+    suggestedFeatures.push('Static Site Generation (SSG) and Server-Side Rendering (SSR) options');
+    suggestedFeatures.push('Route optimization and dynamic layout rendering');
+  } else if (frontendFramework === 'React' || frontendFramework === 'Vue' || frontendFramework === 'Svelte') {
+    suggestedFeatures.push('Single-page application layout with state-driven rendering');
+    suggestedFeatures.push('Modular component hierarchy for reusable visual structures');
+  }
+
+  if (backendFramework) {
+    suggestedFeatures.push(`REST API controllers built on top of ${backendFramework}`);
+  }
+
+  if (database) {
+    suggestedFeatures.push(`Persistent data storage layer matching ${database}`);
+  }
+
+  if (orm) {
+    suggestedFeatures.push(`Structured schema modeling and automated queries using ${orm}`);
+  }
+
+  if (authentication) {
+    suggestedFeatures.push(`Secure routing, credential checks, and authentication via ${authentication}`);
+  }
+
+  if (aiServices) {
+    suggestedFeatures.push(`AI-powered prompt execution and content synthesis via ${aiServices}`);
+  }
+
+  if (deploymentPlatform === 'Docker') {
+    suggestedFeatures.push('Multi-container local setups via Docker Compose configurations');
+  }
+
+  if (testingFramework) {
+    suggestedFeatures.push(`Automated unit and integration test assertions using ${testingFramework}`);
+  }
+
+  if (languagesList.includes('TypeScript')) {
+    suggestedFeatures.push('Strict compile-time type validations and type-safe interfaces');
+  }
+
+  // Base fallbacks if features list is empty
+  if (suggestedFeatures.length === 0) {
+    suggestedFeatures.push('Clean directory layout separating code logical concerns');
+    suggestedFeatures.push('Environment configuration file templates for localized setup');
+  }
+
+  // Generate Installation & Usage instructions
+  let installationInstructions = '';
+  let usageInstructions = '';
+
+  if (projectType === 'static') {
+    installationInstructions = `git clone https://github.com/${owner}/${repo}.git\ncd ${repo}`;
+    usageInstructions = 'Open `index.html` directly in any web browser to view the application.';
+  } else if (projectType === 'react-vite' || projectType === 'nextjs' || projectType === 'nodejs') {
+    const installCmd = packageManager === 'yarn' ? 'yarn install' : packageManager === 'pnpm' ? 'pnpm install' : 'npm install';
+    const devCmd = packageManager === 'yarn' ? 'yarn dev' : packageManager === 'pnpm' ? 'pnpm dev' : 'npm run dev';
+    const startCmd = packageManager === 'yarn' ? 'yarn start' : packageManager === 'pnpm' ? 'pnpm start' : 'npm start';
+    
+    installationInstructions = `git clone https://github.com/${owner}/${repo}.git\ncd ${repo}\n${installCmd}`;
+    usageInstructions = projectType === 'nodejs' 
+      ? `Run the application server:\n\`\`\`bash\n${startCmd}\n\`\`\``
+      : `Run the development server:\n\`\`\`bash\n${devCmd}\n\`\`\``;
+  } else if (projectType === 'python') {
+    if (packageManager === 'poetry') {
+      installationInstructions = `git clone https://github.com/${owner}/${repo}.git\ncd ${repo}\npoetry install`;
+      usageInstructions = 'Run the primary application script:\n```bash\npoetry run python main.py\n```';
+    } else {
+      installationInstructions = `git clone https://github.com/${owner}/${repo}.git\ncd ${repo}\n# Setup virtual environment\npython -m venv venv\nsource venv/bin/activate  # On Windows use venv\\Scripts\\activate\npip install -r requirements.txt`;
+      usageInstructions = 'Run the application:\n```bash\npython main.py\n```';
+    }
+  } else if (projectType === 'java') {
+    if (packageManager === 'mvn') {
+      installationInstructions = `git clone https://github.com/${owner}/${repo}.git\ncd ${repo}\nmvn clean install`;
+      usageInstructions = 'Run the project:\n```bash\nmvn spring-boot:run\n```';
+    } else {
+      installationInstructions = `git clone https://github.com/${owner}/${repo}.git\ncd ${repo}\n./gradlew build`;
+      usageInstructions = 'Run the project:\n```bash\n./gradlew bootRun\n```';
+    }
+  } else if (projectType === 'rust') {
+    installationInstructions = `git clone https://github.com/${owner}/${repo}.git\ncd ${repo}\ncargo build --release`;
+    usageInstructions = 'Run the project binary:\n```bash\ncargo run\n```';
+  } else if (projectType === 'php') {
+    installationInstructions = `git clone https://github.com/${owner}/${repo}.git\ncd ${repo}\ncomposer install`;
+    usageInstructions = 'Start a local PHP development server:\n```bash\nphp -S localhost:8000\n```';
+  } else if (deploymentPlatform === 'Docker') {
+    installationInstructions = `git clone https://github.com/${owner}/${repo}.git\ncd ${repo}\ndocker-compose build`;
+    usageInstructions = 'Start all services containerized:\n```bash\ndocker-compose up\n```';
+  } else {
+    installationInstructions = `git clone https://github.com/${owner}/${repo}.git\ncd ${repo}`;
+    usageInstructions = 'Setup details depend on your localized environment environment.';
+  }
+
+  // Format file tree structure (take first 40 files to avoid context size explosion)
+  const slicedTree = fileTreePaths.slice(0, 45);
 
   return {
+    name: repoName,
+    owner,
+    description,
+    githubUrl,
     stats: { stars, forks, issues, size },
     languages: languagesList,
-    frameworks,
-    libraries,
-    databases,
-    authProviders,
+    packageManager,
+    projectType,
+    frontendFramework,
+    backendFramework,
+    database,
+    orm,
+    authentication,
     aiServices,
-    deploymentConfigs,
+    deploymentPlatform,
+    testingFramework,
+    fileTree: slicedTree,
+    configFiles,
     suggestedFeatures,
+    installationInstructions,
+    usageInstructions
   };
 };

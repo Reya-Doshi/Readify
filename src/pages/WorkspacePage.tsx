@@ -8,7 +8,7 @@ import { useProjects } from '../hooks/useProjects';
 import { useAuth } from '../hooks/useAuth';
 import { compileReadmeLocally } from '../services/readmeCompiler';
 import { analyzeRepository, parseGithubUrl } from '../services/repoAnalyzer';
-import type { AnalysisResult } from '../services/repoAnalyzer';
+import type { RepoProfile } from '../services/repoAnalyzer';
 import { AnalysisSummaryView } from '../components/workspace/AnalysisSummaryView';
 import type { ReadmeProject } from '../types/database';
 import { ArrowLeft, Check, Compass } from 'lucide-react';
@@ -44,7 +44,9 @@ export const WorkspacePage: React.FC = () => {
     description: '',
     tech_stack: [],
     features: [],
-    generated_readme: ''
+    generated_readme: '',
+    repo_metadata: null,
+    analysis_results: null
   });
 
   const [isGenerating, setIsGenerating] = useState(false);
@@ -54,7 +56,7 @@ export const WorkspacePage: React.FC = () => {
   // Repository analysis states
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<RepoProfile | null>(null);
   const [viewStep, setViewStep] = useState<'analysis' | 'editor'>('editor');
   const [analyzedProjectId, setAnalyzedProjectId] = useState<string | null>(null);
 
@@ -70,18 +72,24 @@ export const WorkspacePage: React.FC = () => {
 
       const combinedTech = [
         ...result.languages,
-        ...result.frameworks,
-        ...result.libraries,
-        ...result.databases,
-        ...result.authProviders,
-        ...result.aiServices,
-        ...result.deploymentConfigs
-      ];
+        result.frontendFramework,
+        result.backendFramework,
+        result.database,
+        result.orm,
+        result.authentication,
+        result.aiServices,
+        result.deploymentPlatform,
+        result.testingFramework
+      ].filter((t): t is string => !!t);
 
       setFormData(prev => ({
         ...prev,
+        project_name: result.name,
+        description: result.description || prev.description,
         tech_stack: combinedTech,
-        features: result.suggestedFeatures
+        features: result.suggestedFeatures,
+        repo_metadata: result.stats,
+        analysis_results: result
       }));
       setViewStep('analysis');
       console.log('Repository analysis completed and form populated.');
@@ -104,11 +112,21 @@ export const WorkspacePage: React.FC = () => {
           description: activeProj.description || '',
           tech_stack: activeProj.tech_stack || [],
           features: activeProj.features || [],
-          generated_readme: activeProj.generated_readme || ''
+          generated_readme: activeProj.generated_readme || '',
+          github_url: activeProj.github_url || null,
+          repo_metadata: activeProj.repo_metadata || null,
+          analysis_results: activeProj.analysis_results || null
         });
 
-        // Trigger repo analysis if github_url exists and no generated_readme
-        if (activeProj.github_url && !activeProj.generated_readme && analyzedProjectId !== activeProjectId) {
+        // Load saved analysis results from the database if present
+        if (activeProj.analysis_results && Object.keys(activeProj.analysis_results).length > 0) {
+          setAnalysisResult(activeProj.analysis_results as RepoProfile);
+          if (!activeProj.generated_readme) {
+            setViewStep('analysis');
+          } else {
+            setViewStep('editor');
+          }
+        } else if (activeProj.github_url && !activeProj.generated_readme && analyzedProjectId !== activeProjectId) {
           setAnalyzedProjectId(activeProjectId);
           triggerAnalysis(activeProj.github_url);
         } else if (!activeProj.github_url || activeProj.generated_readme) {
@@ -124,7 +142,9 @@ export const WorkspacePage: React.FC = () => {
       description: preset.description,
       tech_stack: [...preset.tech_stack],
       features: [...preset.features],
-      generated_readme: ''
+      generated_readme: '',
+      repo_metadata: null,
+      analysis_results: null
     });
     setViewStep('editor');
   };
@@ -159,7 +179,8 @@ export const WorkspacePage: React.FC = () => {
           techStack: formData.tech_stack,
           features: formData.features,
           owner: parsed?.owner || null,
-          repo: parsed?.repo || null
+          repo: parsed?.repo || null,
+          repoProfile: analysisResult || null
         }),
       });
 
@@ -195,13 +216,17 @@ export const WorkspacePage: React.FC = () => {
       if (activeProjectId) {
         await updateProject(activeProjectId, {
           ...formData,
-          generated_readme: generatedMarkdown
+          generated_readme: generatedMarkdown,
+          analysis_results: analysisResult || {},
+          repo_metadata: analysisResult?.stats || {}
         });
         setFormData(prev => ({ ...prev, generated_readme: generatedMarkdown }));
       } else {
         const { data: newProj } = await createProject({
           ...formData,
-          generated_readme: generatedMarkdown
+          generated_readme: generatedMarkdown,
+          analysis_results: analysisResult || {},
+          repo_metadata: analysisResult?.stats || {}
         });
         if (newProj) {
           navigateTo('workspace', newProj.id);

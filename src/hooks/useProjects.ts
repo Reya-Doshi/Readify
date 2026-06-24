@@ -45,7 +45,7 @@ export const useProjects = () => {
 
         const { data, error: dbError } = await supabase
           .from('readmes')
-          .select('id, created_at, user_id, repo_name, github_url, markdown_content')
+          .select('id, created_at, user_id, repo_name, github_url, markdown_content, description, tech_stack, features, repo_metadata, analysis_results')
           .order('created_at', { ascending: false });
 
         if (dbError) throw dbError;
@@ -54,12 +54,14 @@ export const useProjects = () => {
         const mappedList: ReadmeProject[] = (data || []).map((row: any) => ({
           id: row.id,
           project_name: row.repo_name || 'Unnamed Repository',
-          description: '', // Omitted from actual schema
-          tech_stack: [], // Omitted from actual schema
-          features: [], // Omitted from actual schema
+          description: row.description || '',
+          tech_stack: row.tech_stack || [],
+          features: row.features || [],
           generated_readme: row.markdown_content || '',
           github_url: row.github_url || null,
           created_at: row.created_at,
+          repo_metadata: row.repo_metadata || null,
+          analysis_results: row.analysis_results || null,
         }));
 
         setProjects(mappedList);
@@ -110,10 +112,15 @@ export const useProjects = () => {
           .insert({
             repo_name: projectData.project_name,
             github_url: projectData.github_url || null,
-            markdown_content: projectData.generated_readme,
+            markdown_content: projectData.generated_readme || '',
+            description: projectData.description || '',
+            tech_stack: projectData.tech_stack || [],
+            features: projectData.features || [],
+            repo_metadata: projectData.repo_metadata || {},
+            analysis_results: projectData.analysis_results || {},
             user_id: user.id
           })
-          .select('id, created_at, user_id, repo_name, github_url, markdown_content')
+          .select('id, created_at, user_id, repo_name, github_url, markdown_content, description, tech_stack, features, repo_metadata, analysis_results')
           .single();
 
         if (dbError) throw dbError;
@@ -121,12 +128,14 @@ export const useProjects = () => {
         const mapped: ReadmeProject = {
           id: data.id,
           project_name: data.repo_name || 'Unnamed Repository',
-          description: '',
-          tech_stack: [],
-          features: [],
+          description: data.description || '',
+          tech_stack: data.tech_stack || [],
+          features: data.features || [],
           generated_readme: data.markdown_content || '',
           github_url: data.github_url || null,
           created_at: data.created_at,
+          repo_metadata: data.repo_metadata || null,
+          analysis_results: data.analysis_results || null,
         };
 
         setProjects((prev) => [mapped, ...prev]);
@@ -173,12 +182,27 @@ export const useProjects = () => {
         if (updates.github_url !== undefined) {
           dbUpdates.github_url = updates.github_url;
         }
+        if (updates.description !== undefined) {
+          dbUpdates.description = updates.description;
+        }
+        if (updates.tech_stack !== undefined) {
+          dbUpdates.tech_stack = updates.tech_stack;
+        }
+        if (updates.features !== undefined) {
+          dbUpdates.features = updates.features;
+        }
+        if (updates.repo_metadata !== undefined) {
+          dbUpdates.repo_metadata = updates.repo_metadata;
+        }
+        if (updates.analysis_results !== undefined) {
+          dbUpdates.analysis_results = updates.analysis_results;
+        }
 
         const { data, error: dbError } = await supabase
           .from('readmes')
           .update(dbUpdates)
           .eq('id', id)
-          .select('id, created_at, user_id, repo_name, github_url, markdown_content')
+          .select('id, created_at, user_id, repo_name, github_url, markdown_content, description, tech_stack, features, repo_metadata, analysis_results')
           .single();
 
         if (dbError) throw dbError;
@@ -186,12 +210,14 @@ export const useProjects = () => {
         const mapped: ReadmeProject = {
           id: data.id,
           project_name: data.repo_name || 'Unnamed Repository',
-          description: '',
-          tech_stack: [],
-          features: [],
+          description: data.description || '',
+          tech_stack: data.tech_stack || [],
+          features: data.features || [],
           generated_readme: data.markdown_content || '',
           github_url: data.github_url || null,
           created_at: data.created_at,
+          repo_metadata: data.repo_metadata || null,
+          analysis_results: data.analysis_results || null,
         };
 
         setProjects((prev) => prev.map((p) => (p.id === id ? mapped : p)));
@@ -257,6 +283,8 @@ export const useProjects = () => {
       features: target.features || [],
       generated_readme: target.generated_readme || '',
       github_url: target.github_url || null,
+      repo_metadata: target.repo_metadata || null,
+      analysis_results: target.analysis_results || null,
     });
   };
 

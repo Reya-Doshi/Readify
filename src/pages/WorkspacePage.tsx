@@ -246,49 +246,6 @@ export const WorkspacePage: React.FC = () => {
     }, 1500);
   };
 
-  const handleImprove = async (instruction: string) => {
-    setIsGenerating(true);
-    
-    // Call backend API or compile enhancement locally
-    try {
-      const response = await fetch('http://localhost:5000/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.project_name,
-          description: formData.description,
-          techStack: formData.tech_stack,
-          features: formData.features,
-          instruction: instruction
-        }),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        const improved = result.readme;
-        if (activeProjectId) {
-          await updateProject(activeProjectId, { generated_readme: improved });
-        }
-        setFormData(prev => ({ ...prev, generated_readme: improved }));
-      } else {
-        throw new Error('Enhancement call failed.');
-      }
-    } catch (err) {
-      // Local fallback append
-      const suffix = `\n\n## 🛡️ Security Audit Note\n*This documentation has been enhanced based on instruction: "${instruction}"*\n\n- Zero-dependency verification enforced.`;
-      const improvedContent = (formData.generated_readme || '') + suffix;
-      
-      if (activeProjectId) {
-        await updateProject(activeProjectId, { generated_readme: improvedContent });
-      }
-      setFormData(prev => ({ ...prev, generated_readme: improvedContent }));
-    }
-    
-    setIsGenerating(false);
-  };
-
   if (isAnalyzing) {
     return (
       <div className="min-h-screen bg-background flex flex-col md:flex-row">

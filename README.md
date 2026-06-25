@@ -49,14 +49,3 @@ npm run dev
 ## 📄 License
 
 This project is licensed under the terms of the MIT License. See [LICENSE](LICENSE) for details.
-
-
-## 🛡️ Security Audit Note
-*This documentation has been enhanced based on instruction: "for tech stack and logo of ecah tech used"*
-
-- Zero-dependency verification enforced.
-
-## 🛡️ Security Audit Note
-*This documentation has been enhanced based on instruction: "add tech logo for all tech"*
-
-- Zero-dependency verification enforced.

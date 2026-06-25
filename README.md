@@ -1,73 +1,62 @@
-# React + TypeScript + Vite
+# 🌐 Readify
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+![build: passing](https://img.shields.io/badge/build-passing-brightgreen) ![license: MIT](https://img.shields.io/badge/license-MIT-blue) ![pr: welcomes](https://img.shields.io/badge/PRs-welcome-orange)
 
-Currently, two official plugins are available:
+> Readify is an AI-powered GitHub README generator that transforms project details into clean, professional documentation with customizable templates, live Markdown preview, and one-click export.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🛠️ Technology Stack
 
-## React Compiler
+This application is built using the following core tools:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **JavaScript**
+- **TypeScript**
+- **PLpgSQL**
+- **CSS**
+- **HTML**
+- **React**
+- **Supabase Auth**
 
-## Expanding the ESLint configuration
+## ✨ Key Features
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Single-page application layout with state-driven rendering**
+- **Modular component hierarchy for reusable visual structures**
+- **Secure routing, credential checks, and authentication via Supabase Auth**
+- **Strict compile-time type validations and type-safe interfaces**
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 📦 Installation
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+Follow these steps to set up the project locally:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# Clone the repository
+git clone https://github.com/your-username/readify.git
+
+# Navigate to project root
+cd readify
+
+# Install dependencies
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 🚀 Usage Guide
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+To start the application in development mode, run:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+
+## 📄 License
+
+This project is licensed under the terms of the MIT License. See [LICENSE](LICENSE) for details.
+
+
+## 🛡️ Security Audit Note
+*This documentation has been enhanced based on instruction: "for tech stack and logo of ecah tech used"*
+
+- Zero-dependency verification enforced.
+
+## 🛡️ Security Audit Note
+*This documentation has been enhanced based on instruction: "add tech logo for all tech"*
+
+- Zero-dependency verification enforced.

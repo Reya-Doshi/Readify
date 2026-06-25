@@ -227,7 +227,7 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
         size="lg"
         onClick={onGenerate}
         isLoading={isGenerating}
-        className="w-full mt-4 bg-accent hover:bg-accent-dark text-white border-none shadow-lg shadow-accent/15"
+        className="w-full mt-4 bg-accent hover:bg-accent-dark text-black border-none shadow-lg shadow-accent/15"
       >
         Generate README
       </Button>

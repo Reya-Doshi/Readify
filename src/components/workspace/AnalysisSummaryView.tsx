@@ -318,7 +318,7 @@ export const AnalysisSummaryView: React.FC<AnalysisSummaryProps> = ({
           onClick={onGenerate}
           isLoading={isGenerating}
           leftIcon={<Play className="h-4.5 w-4.5 fill-current" />}
-          className="flex-1 bg-accent hover:bg-accent-dark text-white border-none shadow-lg shadow-accent/15"
+          className="flex-1 bg-accent hover:bg-accent-dark text-black border-none shadow-lg shadow-accent/15"
         >
           Generate README.md
         </Button>
@@ -328,7 +328,7 @@ export const AnalysisSummaryView: React.FC<AnalysisSummaryProps> = ({
           size="lg"
           onClick={onProceed}
           rightIcon={<ArrowRight className="h-4.5 w-4.5" />}
-          className="px-6 text-neutral-low border-white/[0.08] hover:bg-white/[0.04]"
+          className="px-6 text-black border-white/[0.08] hover:bg-white/[0.04]"
         >
           Skip to Editor
         </Button>

@@ -20,58 +20,34 @@ export async function generateReadme(data) {
   const profile = data.repoProfile || {};
 
   const prompt = `
- Create a professional, recruiter-quality GitHub README.md for the following repository.
+  You are an expert technical writer and developer. Generate a premium‑grade README.md for the repository.
 
- Project Name: ${data.name}
- GitHub Repo: ${data.owner && data.repo ? `${data.owner}/${data.repo}` : "Not specified"}
- Description: ${data.description || profile.description || "Not specified"}
+  ## Repository Context
+  - Name: ${data.name}
+  - Repo: ${data.owner}/${data.repo}
+  - Description: ${data.description || profile.description || "N/A"}
+  - Languages: ${profile.languages?.join(", ") || "N/A"}
+  - Tech Stack: ${[profile.frontendFramework, profile.backendFramework, profile.database, profile.aiServices].filter(Boolean).join(", ")}
+  - Package Manager: ${profile.packageManager || "N/A"}
+  ${data.instruction ? `\n- Special Instructions: ${data.instruction}` : ''}
 
- Detected Technologies:
- - Languages: ${profile.languages ? profile.languages.join(", ") : (data.techStack ? data.techStack.join(", ") : "Not specified")}
- - Frontend Framework: ${profile.frontendFramework || "None"}
- - Backend Framework: ${profile.backendFramework || "None"}
- - Database: ${profile.database || "None"}
- - ORM: ${profile.orm || "None"}
- - Authentication: ${profile.authentication || "None"}
- - AI Services: ${profile.aiServices || "None"}
- - Deployment Platform: ${profile.deploymentPlatform || "None"}
- - Testing Framework: ${profile.testingFramework || "None"}
- - Package Manager: ${profile.packageManager || "None"}
+  ## Instructions for generation
+  1. Use **skillicons.dev** for all technology icons, centered with allowed HTML.
+  2. Begin with a **Hero** section (title, value proposition, badges).
+  3. If a file tree is available, include a **Project Structure** section rendered as a plain‑text tree.
+  4. Add **Feature** cards (concise, ≤3 lines each), not a simple list.
+  5. Add an **Architecture** section containing a Mermaid diagram block.
+  6. Add a **Tech Stack** section using separate headings (Frontend, Backend, Database, AI, etc.) and bullet lists; avoid large tables.
+  7. Add **Installation** and **Usage** sections that are repository‑aware (e.g., npm/yarn/pnpm for Node, pip/poetry for Python). Do not output generic commands.
+  8. Add a **Repository Statistics** section if data is present.
+  9. For **Startup / Hackathon / Academic / Portfolio** projects, include: Overview, Problem Statement, Solution, Features, Tech Stack, Architecture, Project Structure, Installation, Usage.
+ 10. For **Open‑source library** projects, additionally include: Contributing, Code of Conduct, Support, Community, Open Collective, Sponsorship.
+ 11. Do NOT generate any placeholder or filler content such as "Coming Soon", "TBD", "No screenshots available", etc.
+ 12. Do NOT use disallowed HTML tags (e.g., <script>, <style>, <div>, <h1>, <h2>, <h3>).
+ 13. Omit any section that would be empty for the given repo.
+ 14. Output ONLY raw markdown (no surrounding triple backticks).
 
- Project Type: ${profile.projectType || "Unknown"}
- File Tree Layout:
- ${profile.fileTree ? profile.fileTree.join("\n") : "Not provided"}
-
- Config Files Found:
- ${profile.configFiles ? profile.configFiles.join(", ") : "None"}
-
- Suggested Features:
- ${data.features ? data.features.map(f => `- ${f}`).join("\n") : ""}
-
- Default Installation Sequence:
- ${profile.installationInstructions || ""}
-
- Default Usage Sequence:
- ${profile.usageInstructions || ""}
-
- ${data.instruction ? `Apply the following improvement instruction to the document: "${data.instruction}"` : ''}
-
- Generate the README with the following exact section headers:
- 1. # Project Title & Overview: A concise, recruiter-quality project introduction (do not copy-paste or repeat descriptions verbatim).
- 2. ## Features: Convert description and suggested features into actionable, high-quality product capabilities.
- 3. ## Tech Stack: Display the detected tech stack beautifully (using tables, lists, or clean markdown badges).
- 4. ## Architecture: Describe the project folder structure based on the File Tree Layout provided above. Explain key directories.
- 5. ## Installation: Provide precise clone commands and setup instructions using the correct package manager. Do NOT use placeholders like "your-username" or "your-repository". Use "git clone https://github.com/${data.owner || 'owner'}/${data.repo || 'repo'}.git".
- 6. ## Usage: Show real usage commands and examples.
- 7. ## Environment Variables: List any required/optional keys based on the stack (e.g. DATABASE_URL if Prisma is used, NEXTAUTH_SECRET if NextAuth is used, etc.).
- 8. ## Contributing: Clean, standard contributing guides.
- 9. ## License: Standard MIT License unless otherwise specified.
-
- Critical Rules:
- - Never use placeholders like "your-username", "<placeholder>", or "your-repository".
- - Never invent or assume technologies that are not detected in the profile or stack list.
- - Never output generic setup commands (e.g. do not show 'npm install' or 'npm run dev' unless the project type is Node.js/Vite/Next.js).
- - Output ONLY raw markdown content. Do NOT wrap the entire output in triple backticks (e.g. do not wrap in \`\`\`markdown and \`\`\`).
+  Generate the README now:
   `;
 
   const result = await model.generateContent(prompt);

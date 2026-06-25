@@ -110,6 +110,7 @@ export const DashboardPage: React.FC = () => {
             <Button
               variant="primary"
               size="md"
+              className="text-black"
               leftIcon={<Plus className="h-4 w-4" />}
               onClick={() => navigateTo('workspace')}
             >

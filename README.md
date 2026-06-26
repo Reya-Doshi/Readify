@@ -1,4 +1,4 @@
-# <p align="center"><img src="./public/logo.png" alt="Readify Logo" width="150" /><br>Readify</p>
+# <img src="./public/logo.png" alt="Readify Logo" width="40" valign="middle" /> READIFY
 
 An AI-powered repository documentation engine that turns raw codebase evidence—dependencies, files, languages, and structure—into developer-ready README files. Readify analyzes your live codebase structure and configuration files to build a rich repository profile, mapping dependencies to exact tech stack versions, and then lets you compile premium-grade documentation in real-time.
 

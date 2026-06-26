@@ -373,7 +373,7 @@ export const WorkspacePage: React.FC = () => {
               <PreviewPanel
                 content={formData.generated_readme || ''}
                 setContent={(val) => setFormData(prev => ({ ...prev, generated_readme: val }))}
-                onImprove={handleImprove}
+
                 isGenerating={isGenerating}
               />
             </div>

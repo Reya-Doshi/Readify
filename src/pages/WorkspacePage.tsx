@@ -168,7 +168,9 @@ export const WorkspacePage: React.FC = () => {
     
     try {
       // Connect to Node.js Express server to generate README via Gemini
-      const response = await fetch('http://localhost:5000/api/generate', {
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const apiUrl = apiBase.endsWith('/') ? `${apiBase}generate` : `${apiBase}/generate`;
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

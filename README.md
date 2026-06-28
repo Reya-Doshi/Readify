@@ -201,6 +201,12 @@ Unlike general-purpose chatbots, Readify:
 * **Analyzes Before Writing:** Starts from repository code evidence rather than assumptions.
 * **Avoids Hallucinated Steps:** Detects actual project configuration files to formulate correct setup steps.
 * **Understands Standard Document Layouts:** Automatically styles and groups information (e.g., H2/H3 layouts, tech-badges, and code snippets) using proper conventions.
+---
+
+## 🛠️ Engineering Notes
+
+* **Server-Side Cache:** Repository scan results are cached server-side to respect GitHub API rate limits and improve repeat query performance.
+* **Database Security:** Supabase Row-Level Security ensures each user's projects are isolated at the database policy level, not just the application layer.
 
 ---
 

@@ -42,6 +42,14 @@ export const parseGithubUrl = (url: string) => {
   return null;
 };
 
+// Helper to proxy GitHub requests through our backend cache
+const fetchGithub = async (url: string, init?: RequestInit): Promise<Response> => {
+  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const normalizedApiBase = apiBase.endsWith('/') ? apiBase : `${apiBase}/`;
+  const proxyUrl = `${normalizedApiBase}github-proxy?url=${encodeURIComponent(url)}`;
+  return fetch(proxyUrl, init);
+};
+
 // Helper to fetch file content raw from GitHub API
 export const fetchFileContentRaw = async (
   owner: string,
@@ -57,7 +65,7 @@ export const fetchFileContentRaw = async (
     headers['Authorization'] = `Bearer ${token}`;
   }
   try {
-    const res = await fetch(url, { headers });
+    const res = await fetchGithub(url, { headers });
     if (res.ok) {
       return await res.text();
     }
@@ -105,7 +113,7 @@ export const analyzeRepository = async (
 
   // 1. Fetch Repository Metadata
   try {
-    const repoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
+    const repoResponse = await fetchGithub(`https://api.github.com/repos/${owner}/${repo}`, { headers });
     if (repoResponse.ok) {
       const repoData = await repoResponse.json();
       repoName = repoData.name || repo;
@@ -125,7 +133,7 @@ export const analyzeRepository = async (
 
   // 2. Fetch Languages
   try {
-    const langResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/languages`, { headers });
+    const langResponse = await fetchGithub(`https://api.github.com/repos/${owner}/${repo}/languages`, { headers });
     if (langResponse.ok) {
       const langData = await langResponse.json();
       Object.keys(langData).forEach(l => {
@@ -142,7 +150,7 @@ export const analyzeRepository = async (
   let fileTreePaths: string[] = [];
   let gitTreeFetched = false;
   try {
-    const treeResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`, { headers });
+    const treeResponse = await fetchGithub(`https://api.github.com/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`, { headers });
     if (treeResponse.ok) {
       const treeData = await treeResponse.json();
       if (treeData.tree && Array.isArray(treeData.tree)) {
@@ -157,7 +165,7 @@ export const analyzeRepository = async (
   // Fallback to root contents if Git Trees failed or was truncated
   if (!gitTreeFetched) {
     try {
-      const contentsResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents`, { headers });
+      const contentsResponse = await fetchGithub(`https://api.github.com/repos/${owner}/${repo}/contents`, { headers });
       if (contentsResponse.ok) {
         const rootContents = await contentsResponse.json();
         fileTreePaths = rootContents.map((node: any) => node.path);
